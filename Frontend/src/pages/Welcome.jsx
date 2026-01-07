@@ -311,17 +311,24 @@ const Welcome = () => {
         }
 
         .auth-container {
-          padding: 40px;
+          padding: 48px;
+          max-width: 480px;
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
         .auth-header h2 {
-          font-size: 2rem;
+          font-size: 2.2rem;
           margin-bottom: 8px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
         }
 
         .auth-header p {
           color: var(--text-muted);
-          margin-bottom: 32px;
+          margin-bottom: 36px;
+          font-size: 1rem;
         }
 
         .auth-form {
@@ -333,29 +340,37 @@ const Welcome = () => {
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
+          margin-bottom: 4px;
         }
 
         .form-group label {
-          font-size: 0.9rem;
+          font-size: 0.875rem;
           color: var(--text-dim);
-          font-weight: 500;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .form-group input {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--glass-border);
-          padding: 12px 16px;
-          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1.5px solid rgba(255, 255, 255, 0.1);
+          padding: 14px 18px;
+          border-radius: 12px;
           color: white;
           font-size: 1rem;
-          transition: var(--transition-smooth);
+          transition: all 0.3s ease;
         }
 
         .form-group input:focus {
           outline: none;
           border-color: var(--primary);
-          background: rgba(255, 255, 255, 0.06);
+          background: rgba(255, 255, 255, 0.08);
+          box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+        }
+
+        .form-group input::placeholder {
+          color: rgba(255, 255, 255, 0.3);
         }
 
         .input-with-icon {
@@ -378,24 +393,32 @@ const Welcome = () => {
         .role-selector-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
+          gap: 12px;
         }
 
         .role-btn {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--glass-border);
+          background: rgba(255, 255, 255, 0.05);
+          border: 1.5px solid rgba(255, 255, 255, 0.15);
           color: var(--text-dim);
-          padding: 10px 5px;
-          border-radius: 8px;
-          font-size: 0.8rem;
+          padding: 12px 8px;
+          border-radius: 10px;
+          font-size: 0.85rem;
+          font-weight: 600;
           cursor: pointer;
-          transition: var(--transition-smooth);
+          transition: all 0.3s ease;
+        }
+
+        .role-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.25);
+          transform: translateY(-1px);
         }
 
         .role-btn.active {
           background: var(--primary);
           border-color: var(--primary);
           color: white;
+          box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
         }
 
         .error-message {
@@ -410,7 +433,27 @@ const Welcome = () => {
           font-size: 0.85rem;
         }
 
-        .w-full { width: 100%; justify-content: center; margin-top: 10px; }
+        .w-full { 
+          width: 100%; 
+          justify-content: center; 
+          margin-top: 16px;
+          padding: 14px 24px;
+          font-size: 1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          transition: all 0.3s ease;
+        }
+
+        .w-full:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(66, 133, 244, 0.4);
+        }
+
+        .w-full:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          transform: none;
+        }
 
         .auth-footer {
           margin-top: 24px;

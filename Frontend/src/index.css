@@ -7,23 +7,39 @@
   --secondary: #34a853;
   --accent: #fbbc05;
   --danger: #ea4335;
-  
+
   /* Dark Mode Palette */
   --bg-darker: #050505;
   --bg-dark: #0f1115;
   --bg-card: rgba(30, 32, 38, 0.7);
   --border-color: rgba(255, 255, 255, 0.08);
-  
+
   /* Text */
   --text-main: #f8f9fa;
   --text-dim: #9aa0a6;
   --text-muted: #5f6368;
-  
+
   /* Effects */
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg-darker: #f5f7fa;
+  --bg-dark: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --border-color: rgba(0, 0, 0, 0.08);
+
+  --text-main: #202124;
+  --text-dim: #5f6368;
+  --text-muted: #9aa0a6;
+
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
 }
 
 * {
@@ -40,7 +56,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
   font-family: 'Outfit', sans-serif;
   font-weight: 600;
   letter-spacing: -0.02em;
