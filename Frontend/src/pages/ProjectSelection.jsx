@@ -254,7 +254,7 @@ const ProjectSelection = () => {
         )}
       </AnimatePresence>
 
-      <style jsx>{`
+      <style>{`
         .projects-page {
           padding: 40px 80px;
           min-height: 100vh;

@@ -1,25 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BarChart3,
-  TrendingUp,
-  Users,
-  FileText,
-  Download,
-  Calendar,
-  Filter,
   ArrowLeft,
-  Github,
-  MessageSquare,
-  Award,
-  Zap,
+  Download,
+  RefreshCw,
   Edit,
-  X,
-  Plus,
   Trash2,
-  RefreshCw
+  Plus,
+  TrendingUp,
+  Zap,
+  Users,
+  X
 } from 'lucide-react';
 import {
   ScatterChart,
@@ -29,105 +22,42 @@ import {
   ZAxis,
   Tooltip,
   ResponsiveContainer,
-  Cell
+  Cell,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie
 } from 'recharts';
 
 const Dashboard = () => {
-  const { projectId } = useParams();
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState('30d');
-
-  // Data State
+  const { projectId } = useParams();
   const [project, setProject] = useState(null);
   const [teamData, setTeamData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  // UI State
-  const [user, setUser] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMembers, setEditingMembers] = useState([]);
+  const [saving, setSaving] = useState(false);
 
-  // Load User
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
+    fetchData();
+  }, [projectId]);
 
-  // Fetch Data
   const fetchData = async () => {
     try {
       setLoading(true);
-
-      // Parallel fetch: Project Details & Analytics
-      const [projectRes, analyticsRes] = await Promise.all([
+      const [projRes, analyticsRes] = await Promise.all([
         axios.get(`/api/projects/${projectId}`),
         axios.get(`/api/analytics/${projectId}`)
       ]);
-
-      setProject(projectRes.data);
-      setTeamData(analyticsRes.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      setProject(projRes.data);
+      setTeamData(analyticsRes.data.members || []);
+      setEditingMembers(projRes.data.members || []);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+    } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (projectId) fetchData();
-  }, [projectId]);
-
-  // Handlers
-  const handleExportPDF = () => {
-    window.print();
-  };
-
-  const handleGenerateReport = () => {
-    const reportData = {
-      project: project?.name,
-      timeRange,
-      teamData,
-      generatedAt: new Date().toLocaleString()
-    };
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `venusync-report-${Date.now()}.json`;
-    link.click();
-  };
-
-  // Edit Team Logic
-  const openEditModal = () => {
-    // Deep copy to strictly avoid mutating project state directly
-    const membersCopy = project?.members ? project.members.map(m => ({ ...m })) : [];
-    setEditingMembers(membersCopy);
-    setShowEditModal(true);
-  };
-
-  // ... (rest is same)
-
-
-  const handleAddMember = () => {
-    setEditingMembers([...editingMembers, { name: '', github: '', slack: '' }]);
-  };
-
-  const handleRemoveMember = (index) => {
-    const newMembers = [...editingMembers];
-    newMembers.splice(index, 1);
-    setEditingMembers(newMembers);
-  };
-
-  const handleMemberChange = (index, field, value) => {
-    const newMembers = editingMembers.map((member, i) => {
-      if (i === index) {
-        return { ...member, [field]: value };
-      }
-      return member;
-    });
-    setEditingMembers(newMembers);
   };
 
   const handleSaveTeam = async () => {
@@ -135,29 +65,39 @@ const Dashboard = () => {
       setSaving(true);
       await axios.put(`/api/projects/${projectId}`, { members: editingMembers });
       setShowEditModal(false);
-      await fetchData(); // Wait for data refresh
-      setSaving(false);
-    } catch (error) {
-      console.error("Failed to update team", error);
-      alert("Failed to save changes. Please check the console for details.");
+      fetchData();
+    } catch (err) {
+      console.error('Error saving team:', err);
+      alert('Failed to save team members');
+    } finally {
       setSaving(false);
     }
+  };
+
+  const handleMemberChange = (idx, field, value) => {
+    const updated = [...editingMembers];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setEditingMembers(updated);
+  };
+
+  const handleAddMember = () => {
+    setEditingMembers([...editingMembers, { name: '', github: '' }]);
+  };
+
+  const handleRemoveMember = (idx) => {
+    setEditingMembers(editingMembers.filter((_, i) => i !== idx));
   };
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="custom-tooltip glass">
+        <div className="custom-tooltip">
           <p className="tooltip-name">{data.name}</p>
-          <p className="tooltip-role">{data.role}</p>
           <div className="tooltip-stats">
-            <span className="stat-label">Visibility: {data.visibility}%</span>
-            <span className="stat-label">Impact: {data.impact}%</span>
+            <span>Impact: {data.impact}%</span>
+            <span>Visibility: {data.visibility}%</span>
           </div>
-          <span className={`badge-type ${data.type ? data.type.replace(/\s+/g, '-').toLowerCase() : ''}`}>
-            {data.type}
-          </span>
         </div>
       );
     }
@@ -166,550 +106,248 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page">
-      <header className="dash-header glass">
+      <header className="dash-header">
         <div className="header-left">
           <button className="btn-back" onClick={() => navigate('/projects')}>
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </button>
-          <div className="project-title">
-            <span className="breadcrumb">Projects / {project?.name || 'Loading...'}</span>
-            <h1>Contribution Analytics</h1>
+          <div className="header-text">
+            <span className="breadcrumb">{project?.name || 'Project'} / Data Analysis</span>
+            <h1>Engineering Impact</h1>
           </div>
         </div>
-
         <div className="header-actions">
-          <button className="btn-secondary" onClick={fetchData} title="Refresh Data">
-            <RefreshCw size={18} />
+          <button className="btn-secondary" onClick={fetchData} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
           </button>
-
-          <button className="btn-secondary" onClick={openEditModal}>
-            <Edit size={18} /> Edit Team
+          <button className="btn-secondary" onClick={() => setShowEditModal(true)}>
+            <Edit size={14} /> Edit Members
           </button>
-
-          <button className="btn-secondary" onClick={handleGenerateReport}>
-            <FileText size={18} /> Report
+          <button className="btn-primary">
+            <Download size={14} /> Export CSV
           </button>
-
-          <button className="btn-primary" onClick={handleExportPDF}>
-            <Download size={18} /> Export PDF
-          </button>
-
-          <div className="user-profile glass">
-            <div className="user-avatar">
-              {(user?.name || 'AR').split(' ').map(n => n[0]).join('')}
-            </div>
-            <div className="user-info">
-              <span className="name">{user?.name || 'Alex'}</span>
-              <span className="role">{user?.role || 'Admin'}</span>
-            </div>
-          </div>
         </div>
       </header>
 
-      <div className="stats-row">
-        <div className="mini-card glass-card">
-          <TrendingUp className="text-secondary" />
-          <div className="card-data">
-            <span className="label">Team Productivity</span>
-            <span className="value">
-              {teamData.length > 0 ? `+${Math.floor(teamData.reduce((acc, curr) => acc + curr.impact, 0) / teamData.length)}%` : '0%'}
-            </span>
+      <div className="metrics-summary">
+        <div className="metric-card glass-card">
+          <div className="metric-icon"><TrendingUp size={20} color="#1a73e8" /></div>
+          <div className="metric-info">
+            <span className="label">Performance Index</span>
+            <span className="value">84.2</span>
           </div>
         </div>
-        <div className="mini-card glass-card">
-          <Zap className="text-accent" />
-          <div className="card-data">
-            <span className="label">Efficiency Score</span>
-            <span className="value">84/100</span>
+        <div className="metric-card glass-card">
+          <div className="metric-icon"><Zap size={20} color="#188038" /></div>
+          <div className="metric-info">
+            <span className="label">Active Sprint Impact</span>
+            <span className="value">{teamData.length > 0 ? (teamData.reduce((acc, m) => acc + (m.raw?.commits || 0), 0) / 10).toFixed(1) : '0.0'}</span>
           </div>
         </div>
-        <div className="mini-card glass-card">
-          <Users className="text-primary" />
-          <div className="card-data">
-            <span className="label">Active Squad</span>
+        <div className="metric-card glass-card">
+          <div className="metric-icon"><Users size={20} color="#d93025" /></div>
+          <div className="metric-info">
+            <span className="label">Team Load</span>
             <span className="value">{teamData.length} members</span>
           </div>
         </div>
       </div>
 
-      <main className="dashboard-grid">
-        <section className="chart-section glass-card">
-          <div className="section-header">
-            <h3>Visibility vs. Impact</h3>
-            <p>Identifying Silent Architects and high-noise contributors</p>
+      <div className="dashboard-grid">
+        <div className="chart-wrapper glass-card">
+          <div className="chart-header">
+            <h3>Visibility vs. Impact Map</h3>
+            <p>Monitors alignment between execution and perception</p>
           </div>
-          {loading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Calculating Impact Metrics...</p>
+          <div className="chart-content">
+            <ResponsiveContainer width="100%" height={280}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 0, left: -20 }}>
+                <XAxis type="number" dataKey="visibility" stroke="#5f6368" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis type="number" dataKey="impact" stroke="#5f6368" fontSize={10} axisLine={false} tickLine={false} />
+                <ZAxis type="number" range={[40, 40]} />
+                <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter data={teamData} fill="#1a73e8">
+                  {teamData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.impact > 60 && entry.visibility < 40 ? '#188038' : entry.visibility > 70 && entry.impact < 50 ? '#d93025' : '#1a73e8'}
+                    />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="chart-wrapper glass-card">
+          <div className="chart-header">
+            <h3>Execution Volume</h3>
+            <p>Weighted contribution metrics per individual</p>
+          </div>
+          <div className="chart-content">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={teamData.map(m => ({ name: m.name.split(' ')[0], val: (m.raw?.commits || 0) + (m.raw?.prs || 0) }))}>
+                <XAxis dataKey="name" stroke="#5f6368" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#5f6368" fontSize={10} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ backgroundColor: '#202124', border: '1px solid #3c4043', fontSize: '12px' }} />
+                <Bar dataKey="val" fill="#1a73e8" radius={[2, 2, 0, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="chart-wrapper glass-card">
+          <div className="chart-header">
+            <h3>Equity Distribution</h3>
+            <p>Relative ownership of project success</p>
+          </div>
+          <div className="chart-content">
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={teamData}
+                  innerRadius={55}
+                  outerRadius={75}
+                  paddingAngle={2}
+                  dataKey="impact"
+                  nameKey="name"
+                  stroke="none"
+                >
+                  {teamData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`rgba(26, 115, 232, ${1 - index * 0.12})`} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#202124', border: '1px solid #3c4043', fontSize: '12px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="table-wrapper glass-card full-width">
+          <div className="chart-header">
+            <h3>Squad Execution Matrix</h3>
+            <p>Deep-dive into individual contributor performance levels</p>
+          </div>
+          <div className="data-table">
+            <div className="table-row head">
+              <div className="cell member">Collaborator</div>
+              <div className="cell tags">Classification</div>
+              <div className="cell metric">Impact</div>
+              <div className="cell stat">Commits</div>
+              <div className="cell stat">PRs</div>
+              <div className="cell stat">Merges</div>
+              <div className="cell trend">Execution</div>
             </div>
-          ) : (
-            <>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={400}>
-                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                    <XAxis
-                      type="number"
-                      dataKey="visibility"
-                      name="Visibility"
-                      domain={[0, 100]}
-                      unit="%"
-                      stroke="var(--text-muted)"
-                      label={{ value: 'Perceived Visibility', position: 'bottom', offset: 0, fill: 'var(--text-dim)' }}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="impact"
-                      name="Impact"
-                      domain={[0, 100]}
-                      unit="%"
-                      stroke="var(--text-muted)"
-                      label={{ value: 'Actual Impact', angle: -90, position: 'left', fill: 'var(--text-dim)' }}
-                    />
-                    <ZAxis type="number" range={[100, 300]} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                    <Scatter name="Team" data={teamData}>
-                      {teamData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={
-                            entry.impact > 60 && entry.visibility < 40 ? '#34a853' : // Silent Architect (Green)
-                              entry.visibility > 70 && entry.impact < 50 ? '#ea4335' : // High Noise (Red)
-                                '#4285f4' // Core (Blue)
-                          }
-                        />
-                      ))}
-                    </Scatter>
-                  </ScatterChart>
-                </ResponsiveContainer>
+            {teamData.sort((a, b) => b.impact - a.impact).map((m, i) => (
+              <div className="table-row" key={i}>
+                <div className="cell member">
+                  <span className="member-name">{m.name}</span>
+                  <span className="member-github">@{m.github || 'no-login'}</span>
+                </div>
+                <div className="cell tags">
+                  <span className={`status-pill ${m.type ? m.type.replace(/\s+/g, '-').toLowerCase() : ''}`}>
+                    {m.type}
+                  </span>
+                </div>
+                <div className="cell metric impact">{m.impact}%</div>
+                <div className="cell stat">{m.raw?.commits || 0}</div>
+                <div className="cell stat">{m.raw?.prs || 0}</div>
+                <div className="cell stat">{m.raw?.merged || 0}</div>
+                <div className="cell trend">
+                  <div className="mini-bar-track">
+                    <div className="mini-bar-fill" style={{ width: `${m.impact}%` }}></div>
+                  </div>
+                </div>
               </div>
-              <div className="chart-legend">
-                <div className="legend-item"><span className="dot silent"></span> Silent Architect</div>
-                <div className="legend-item"><span className="dot noisy"></span> High Noise</div>
-                <div className="legend-item"><span className="dot balanced"></span> Core Contributor</div>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="leaderboard-section glass-card">
-          <div className="section-header">
-            <h3>Top Contributors</h3>
-            <button className="btn-icon"><Filter size={16} /></button>
-          </div>
-          <div className="contributor-list">
-            {teamData.sort((a, b) => b.impact - a.impact).map((member, i) => (
-              <motion.div
-                key={i}
-                className="member-row"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <div className="rank">#{i + 1}</div>
-                <div className="member-info">
-                  <p className="name">{member.name}</p>
-                  <p className="role">{member.type || member.role}</p>
-                </div>
-                <div className="member-metrics">
-                  <div className="metric-group" title="Impact Score">
-                    <Award size={14} className="text-secondary" />
-                    <span className="metric-val">{member.impact}</span>
-                  </div>
-                  <div className="metric-group" title="Github Activity">
-                    <Github size={14} className="text-muted" />
-                    <span className="metric-val">{member.visibility}%</span>
-                  </div>
-                </div>
-                <div className="impact-score">
-                  <div className="score-bar">
-                    <div className="bar-fill" style={{ width: `${member.impact}%` }}></div>
-                  </div>
-                </div>
-              </motion.div>
             ))}
-            {teamData.length === 0 && !loading && (
-              <div className="empty-state">
-                <p>No contributors found.</p>
-              </div>
-            )}
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
 
-      {/* Edit Team Modal */}
       <AnimatePresence>
         {showEditModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="modal glass-card"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-            >
+          <div className="modal-overlay">
+            <motion.div className="modal-content glass-card" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
               <div className="modal-header">
-                <h2>Edit Team Members</h2>
-                <button onClick={() => setShowEditModal(false)}><X size={20} /></button>
+                <h2>Manage Collaborators</h2>
+                <button className="close-btn" onClick={() => setShowEditModal(false)}><X size={18} /></button>
               </div>
               <div className="modal-body">
-                <div className="members-list">
-                  {editingMembers.map((member, idx) => (
-                    <div key={idx} className="member-input-row">
-                      <input
-                        type="text"
-                        placeholder="Name"
-                        value={member.name}
-                        onChange={(e) => handleMemberChange(idx, 'name', e.target.value)}
-                      />
-                      <input
-                        type="text"
-                        placeholder="GitHub Username"
-                        value={member.github}
-                        onChange={(e) => handleMemberChange(idx, 'github', e.target.value)}
-                      />
-                      <button className="btn-icon danger" onClick={() => handleRemoveMember(idx)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button className="btn-dashed" onClick={handleAddMember}>
-                  <Plus size={16} /> Add Member
-                </button>
+                {editingMembers.map((m, idx) => (
+                  <div key={idx} className="input-group">
+                    <input value={m.name} onChange={(e) => handleMemberChange(idx, 'name', e.target.value)} placeholder="Display Name" />
+                    <input value={m.github} onChange={(e) => handleMemberChange(idx, 'github', e.target.value)} placeholder="GitHub ID" />
+                    <button onClick={() => handleRemoveMember(idx)} className="trash-btn"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+                <button className="add-btn" onClick={handleAddMember}><Plus size={14} /> Add Associate</button>
               </div>
               <div className="modal-footer">
-                <button className="btn-secondary" onClick={() => setShowEditModal(false)} disabled={saving}>Cancel</button>
-                <button className="btn-primary" onClick={handleSaveTeam} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
+                <button className="btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button className="btn-primary" onClick={handleSaveTeam} disabled={saving}>{saving ? 'Saving...' : 'Apply Changes'}</button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
-      <style jsx>{`
-        /* Reuse existing styles plus Modal Styles */
-        .dashboard-page {
-          padding: 30px;
-          background: var(--bg-darker);
-          min-height: 100vh;
-        }
+      <style>{`
+        .dashboard-page { padding: 40px 60px; min-height: 100vh; background: var(--bg-darker); }
+        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .btn-back { border: 1px solid var(--border-color); background: transparent; color: white; padding: 6px; border-radius: 6px; cursor: pointer; }
+        .breadcrumb { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 4px; }
+        .header-text h1 { font-size: 1.5rem; font-weight: 500; color: #fff; }
+        .header-actions { display: flex; gap: 10px; }
+        .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 16px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-secondary:hover { border-color: var(--text-main); color: #fff; }
 
-        .dash-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px 30px;
-          border-radius: 20px;
-          margin-bottom: 30px;
-        }
+        .metrics-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px; }
+        .metric-card { padding: 20px; display: flex; align-items: center; gap: 16px; }
+        .metric-icon { background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; }
+        .metric-info .label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; display: block; margin-bottom: 2px; }
+        .metric-info .value { font-size: 1.4rem; font-weight: 500; color: #fff; }
 
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .full-width { grid-column: 1 / -1; }
+        .chart-wrapper { display: flex; flex-direction: column; overflow: hidden; }
+        .chart-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+        .chart-header h3 { font-size: 0.9rem; font-weight: 500; color: #fff; }
+        .chart-header p { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+        .chart-content { padding: 20px 10px 10px 10px; }
 
-        .btn-back {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid var(--border-color);
-          color: white;
-          padding: 8px;
-          border-radius: 10px;
-          cursor: pointer;
-        }
+        .data-table { width: 100%; }
+        .table-row { display: grid; grid-template-columns: 1.5fr 150px 80px 80px 80px 80px 1.2fr; padding: 12px 20px; border-bottom: 1px solid var(--border-color); align-items: center; font-size: 0.85rem; }
+        .table-row.head { background: rgba(255,255,255,0.02); color: var(--text-dim); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; font-weight: 600; }
+        .member-name { font-weight: 500; color: #fff; display: block; }
+        .member-github { font-size: 0.7rem; color: var(--text-dim); }
+        .status-pill { font-size: 0.65rem; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .status-pill.core-contributor { background: rgba(26,115,232,0.1); color: #8ab4f8; }
+        .status-pill.silent-architect { background: rgba(24,128,56,0.1); color: #81c995; }
+        .metric.impact { color: var(--primary); font-weight: 600; }
+        .cell.stat { font-family: monospace; color: var(--text-muted); text-align: center; }
+        .mini-bar-track { height: 4px; background: #3c4043; border-radius: 2px; width: 100%; max-width: 140px; overflow: hidden; }
+        .mini-bar-fill { height: 100%; background: var(--primary); }
 
-        .breadcrumb {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
+        .custom-tooltip { background: #202124; border: 1px solid #3c4043; padding: 10px; border-radius: 4px; font-size: 0.75rem; }
+        .tooltip-name { font-weight: 600; margin-bottom: 4px; }
+        .tooltip-stats { display: flex; flex-direction: column; color: var(--text-dim); }
 
-        .project-title h1 {
-          font-size: 1.5rem;
-          margin-top: 4px;
-        }
-
-        .header-actions {
-          display: flex;
-          gap: 12px;
-        }
-
-        .btn-secondary {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid var(--border-color);
-          color: white;
-          padding: 10px 20px;
-          border-radius: 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-weight: 500;
-          transition: all 0.2s;
-        }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { width: 100%; max-width: 500px; padding: 24px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { font-size: 1.1rem; font-weight: 500; }
+        .close-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; }
+        .input-group { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; }
+        .input-group input { background: #121212; border: 1px solid #3c4043; padding: 8px 12px; border-radius: 4px; color: #fff; font-size: 0.8rem; outline: none; }
+        .input-group input:focus { border-color: var(--primary); }
+        .trash-btn { background: rgba(217,48,37,0.1); border: none; color: #f28b82; padding: 8px; border-radius: 4px; cursor: pointer; }
+        .add-btn { width: 100%; background: transparent; border: 1px dashed #3c4043; color: var(--text-dim); padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+        .add-btn:hover { border-color: var(--text-muted); color: #fff; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
         
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-        }
-
-        .user-profile {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 6px 16px;
-          border-radius: 12px;
-        }
-
-        .user-avatar {
-          width: 32px;
-          height: 32px;
-          background: var(--primary);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.8rem;
-          font-weight: 700;
-        }
-
-        .user-info {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .user-info .name { font-size: 0.85rem; font-weight: 600; }
-        .user-info .role { font-size: 0.7rem; color: var(--text-muted); }
-
-        .stats-row {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-          margin-bottom: 30px;
-        }
-
-        .mini-card {
-          padding: 24px;
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
-
-        .mini-card :global(svg) { width: 32px; height: 32px; }
-        .card-data .label { display: block; color: var(--text-dim); font-size: 0.9rem; margin-bottom: 4px; }
-        .card-data .value { font-size: 1.8rem; font-weight: 700; font-family: 'Outfit'; }
-
-        .dashboard-grid {
-          display: grid;
-          grid-template-columns: 1.4fr 0.6fr;
-          gap: 24px;
-        }
-
-        .section-header {
-          margin-bottom: 30px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-        }
-
-        .section-header h3 { font-size: 1.25rem; margin-bottom: 4px; }
-        .section-header p { color: var(--text-muted); font-size: 0.9rem; }
-
-        .chart-container { padding: 20px; }
-
-        .chart-legend {
-          display: flex;
-          justify-content: center;
-          gap: 24px;
-          margin-top: 20px;
-          padding-top: 20px;
-          border-top: 1px solid var(--border-color);
-        }
-
-        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
-        .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .dot.silent { background: #34a853; }
-        .dot.noisy { background: #ea4335; }
-        .dot.balanced { background: #4285f4; }
-        
-        .loading-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 300px;
-            color: var(--text-muted);
-        }
-        
-        .spinner {
-             width: 40px;
-             height: 40px;
-             border: 3px solid rgba(255, 255, 255, 0.1);
-             border-top-color: var(--primary);
-             border-radius: 50%;
-             animation: spin 1s linear infinite;
-             margin-bottom: 16px;
-        }
-        
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Contributor List */
-        .contributor-list { display: flex; flex-direction: column; gap: 16px; }
-        .member-row {
-          display: grid;
-          grid-template-columns: 40px 1fr auto auto;
-          align-items: center;
-          gap: 16px;
-          padding: 12px;
-          border-radius: 12px;
-          transition: 0.2s;
-        }
-        .member-row:hover { background: rgba(255, 255, 255, 0.03); }
-        .rank { font-weight: 700; color: var(--text-muted); }
-        .member-info .name { font-weight: 600; font-size: 0.95rem; }
-        .member-info .role { font-size: 0.8rem; color: var(--text-muted); }
-        
-        .member-metrics { display: flex; gap: 16px; min-width: 100px;}
-        .metric-group { display: flex; align-items: center; gap: 6px; }
-        .metric-val { font-weight: 600; font-size: 0.9rem; }
-
-        .impact-score { width: 80px; }
-        .score-bar {
-          height: 4px;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 2px;
-          overflow: hidden;
-        }
-        .bar-fill { height: 100%; background: var(--primary); }
-
-        /* Tooltip & Badges */
-        .custom-tooltip { padding: 12px; border-radius: 12px; background: rgba(16, 20, 30, 0.95); border: 1px solid var(--border-color); backdrop-filter: blur(10px); }
-        .tooltip-name { font-weight: 700; margin-bottom: 2px; }
-        .tooltip-role { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
-        .tooltip-stats { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;}
-        .stat-label { font-size: 0.85rem; color: var(--text-dim); }
-        .badge-type { font-size: 0.75rem; padding: 4px 8px; border-radius: 100px; font-weight: 600; text-transform: uppercase; }
-        
-        .silent-architect { background: rgba(52, 168, 83, 0.2); color: #34a853; }
-        .high-visibility, .high-noise { background: rgba(234, 67, 53, 0.2); color: #ea4335; }
-        .core-contributor { background: rgba(66, 133, 244, 0.2); color: #4285f4; }
-        .contributor { background: rgba(255, 255, 255, 0.1); color: white; }
-
-        /* Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal {
-            background: var(--bg-card);
-            padding: 30px;
-            border-radius: 24px;
-            width: 100%;
-            max-width: 600px;
-            border: 1px solid var(--border-color);
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-        
-        .modal-body {
-            max-height: 60vh;
-            overflow-y: auto;
-            margin-bottom: 24px;
-        }
-        
-        .members-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        
-        .member-input-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 12px;
-        }
-        
-        .member-input-row input {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 8px;
-            color: white;
-            outline: none;
-        }
-        
-        .member-input-row input:focus {
-            border-color: var(--primary);
-        }
-        
-        .btn-icon.danger {
-            color: var(--danger);
-            background: rgba(234, 67, 53, 0.1);
-            border: none;
-            padding: 10px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        
-        .btn-dashed {
-            width: 100%;
-            border: 1px dashed var(--border-color);
-            background: transparent;
-            color: var(--text-dim);
-            padding: 12px;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: 0.2s;
-        }
-        
-        .btn-dashed:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-        }
-
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );

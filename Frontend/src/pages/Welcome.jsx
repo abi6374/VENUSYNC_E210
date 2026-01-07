@@ -37,7 +37,7 @@ const Welcome = () => {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const payload = isLogin ? { email, password } : { name, email, password, role };
 
-      const response = await axios.post(`/api/auth${endpoint.replace('/api/auth', '')}`, payload);
+      const response = await axios.post(endpoint, payload);
 
       // Store user info
       localStorage.setItem('user', JSON.stringify(response.data));
@@ -185,7 +185,7 @@ const Welcome = () => {
               </div>
             </div>
 
-            <button type="submit" className="btn-primary w-full" disabled={loading || !!error && !isLogin}>
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
               {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
               {!loading && <ArrowRight size={18} />}
             </button>
@@ -218,7 +218,7 @@ const Welcome = () => {
         </div>
       </section>
 
-      <style jsx>{`
+      <style>{`
         .welcome-page {
           min-height: 100vh;
           padding: 20px 80px;
