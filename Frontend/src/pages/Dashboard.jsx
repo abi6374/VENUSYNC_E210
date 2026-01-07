@@ -64,7 +64,7 @@ const Dashboard = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/analytics/${projectId}`);
+      const response = await axios.get(`http://localhost:5000/api/analytics/${projectId}`);
       setTeamData(response.data);
       setLoading(false);
     } catch (error) {

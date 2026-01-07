@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, Github, Slack, Zap, BarChart3, Users, Mail, User, Lock, ChevronDown, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Github, Slack, Zap, BarChart3, Users, Mail, User, Lock, ChevronDown, AlertCircle, Sun, Moon } from 'lucide-react';
 import axios from 'axios';
 
 const Welcome = () => {
@@ -12,7 +12,21 @@ const Welcome = () => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState('dark');
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -23,7 +37,7 @@ const Welcome = () => {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const payload = isLogin ? { email, password } : { name, email, password, role };
 
-      const response = await axios.post(endpoint, payload);
+      const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
 
       // Store user info
       localStorage.setItem('user', JSON.stringify(response.data));
@@ -48,6 +62,9 @@ const Welcome = () => {
           <span>Venusync</span>
         </div>
         <div className="nav-links">
+          <button className="btn-icon" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
           <button className="btn-primary" onClick={() => setIsLogin(true)}>Login</button>
           <button className="btn-primary" onClick={() => setIsLogin(false)}>Get Started</button>
         </div>
@@ -255,6 +272,26 @@ const Welcome = () => {
         .nav-links {
           display: flex;
           gap: 20px;
+          align-items: center;
+        }
+
+        .btn-icon {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--glass-border);
+          color: var(--text-main);
+          padding: 10px;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: var(--transition-smooth);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .btn-icon:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: var(--primary);
+          color: var(--primary);
         }
 
         .btn-ghost {
