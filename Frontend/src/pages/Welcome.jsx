@@ -389,7 +389,7 @@ const Welcome = () => {
 
         .input-with-icon input {
           width: 100%;
-          padding-left: 50px !important;
+          padding-left: 48px !important;
         }
 
         .role-selector-grid {
