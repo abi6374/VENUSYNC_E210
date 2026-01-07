@@ -40,7 +40,7 @@ const ProjectSelection = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get('/api/projects');
+      const response = await axios.get('api/projects');
       setProjects(response.data);
       setLoading(false);
     } catch (error) {
@@ -52,7 +52,7 @@ const ProjectSelection = () => {
   const handleCreateProject = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/projects', {
+      const response = await axios.post('api/projects', {
         name: newProject.name,
         repository: newProject.repository,
         members: newProject.members

@@ -34,7 +34,7 @@ const Welcome = () => {
     setLoading(true);
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const endpoint = isLogin ? 'api/auth/login' : 'api/auth/register';
       const payload = isLogin ? { email, password } : { name, email, password, role };
 
       const response = await axios.post(endpoint, payload);
