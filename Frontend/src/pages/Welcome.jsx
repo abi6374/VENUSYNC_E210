@@ -37,7 +37,7 @@ const Welcome = () => {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const payload = isLogin ? { email, password } : { name, email, password, role };
 
-      const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
+      const response = await axios.post(`/api/auth${endpoint.replace('/api/auth', '')}`, payload);
 
       // Store user info
       localStorage.setItem('user', JSON.stringify(response.data));

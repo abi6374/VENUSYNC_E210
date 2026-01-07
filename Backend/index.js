@@ -7,6 +7,11 @@ import dotenv from 'dotenv';
 import * as mlBridge from './ml_bridge.js';
 import User from './models/User.js';
 import Project from './models/Project.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -118,6 +123,15 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Internal Server Error' });
 });
+
+// Serve static assets in production
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../Frontend/dist')));
+
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../Frontend/dist', 'index.html'));
+    });
+}
 
 app.listen(PORT, () => {
     console.log(`Venusync Server running on port ${PORT}`);
