@@ -1,201 +1,248 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
-    FolderPlus,
-    Search,
-    LayoutGrid,
-    List,
-    Plus,
-    Github,
-    Slack,
-    X,
-    CreditCard,
-    ChevronRight,
-    User
+  FolderPlus,
+  Search,
+  LayoutGrid,
+  List,
+  Plus,
+  Github,
+  Slack,
+  X,
+  CreditCard,
+  ChevronRight,
+  User
 } from 'lucide-react';
 
 const ProjectSelection = () => {
-    const [showModal, setShowModal] = useState(false);
-    const [projects, setProjects] = useState([
-        { id: '1', name: 'Cloud Infrastructure', members: 12, lastSync: '2h ago' },
-        { id: '2', name: 'Mobile App Redesign', members: 8, lastSync: '5h ago' },
-        { id: '3', name: 'Payment Gateway API', members: 5, lastSync: '1d ago' },
-    ]);
-    const [newProject, setNewProject] = useState({ name: '', members: [] });
-    const [currentMember, setCurrentMember] = useState({ name: '', github: '', slack: '' });
-    const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
+  const [projects, setProjects] = useState([
+    { id: '1', name: 'Cloud Infrastructure', members: 12, lastSync: '2h ago' },
+    { id: '2', name: 'Mobile App Redesign', members: 8, lastSync: '5h ago' },
+    { id: '3', name: 'Payment Gateway API', members: 5, lastSync: '1d ago' },
+  ]);
+  const [newProject, setNewProject] = useState({ name: '', members: [] });
+  const [currentMember, setCurrentMember] = useState({ name: '', github: '', slack: '' });
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
 
-    const handleCreateProject = (e) => {
-        e.preventDefault();
-        const project = {
-            id: Date.now().toString(),
-            name: newProject.name,
-            members: newProject.members.length,
-            lastSync: 'Just now'
-        };
-        setProjects([project, ...projects]);
-        setShowModal(false);
-        setNewProject({ name: '', members: [] });
-    };
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    fetchProjects();
+  }, []);
 
-    const addMember = () => {
-        if (currentMember.name && currentMember.github) {
-            setNewProject({
-                ...newProject,
-                members: [...newProject.members, currentMember]
-            });
-            setCurrentMember({ name: '', github: '', slack: '' });
-        }
-    };
+  const fetchProjects = async () => {
+    try {
+      const response = await axios.get('/api/projects');
+      setProjects(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setLoading(false);
+    }
+  };
 
-    const removeMember = (index) => {
-        const updatedMembers = [...newProject.members];
-        updatedMembers.splice(index, 1);
-        setNewProject({ ...newProject, members: updatedMembers });
-    };
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('/api/projects', {
+        name: newProject.name,
+        members: newProject.members
+      });
+      setProjects([response.data, ...projects]);
+      setShowModal(false);
+      setNewProject({ name: '', members: [] });
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
+  };
 
-    return (
-        <div className="projects-page">
-            <header className="page-header">
-                <div className="header-left">
-                    <h1>My Squads</h1>
-                    <p>Select a project to view impact metrics</p>
-                </div>
-                <div className="header-right">
-                    <div className="search-bar glass">
-                        <Search size={18} />
-                        <input type="text" placeholder="Search projects..." />
-                    </div>
-                    <div className="manager-profile" onClick={() => navigate('/dashboard/1')}>
-                        <div className="profile-info">
-                            <span className="profile-name">Alex Rivera</span>
-                            <span className="profile-role">Senior Manager</span>
-                        </div>
-                        <div className="profile-avatar">AR</div>
-                    </div>
-                </div>
-            </header>
+  const addMember = () => {
+    if (currentMember.name && currentMember.github) {
+      setNewProject({
+        ...newProject,
+        members: [...newProject.members, currentMember]
+      });
+      setCurrentMember({ name: '', github: '', slack: '' });
+    }
+  };
 
-            <div className="actions-bar">
-                <div className="view-toggles">
-                    <button className="btn-icon active"><LayoutGrid size={20} /></button>
-                    <button className="btn-icon"><List size={20} /></button>
-                </div>
-                <button className="btn-primary" onClick={() => setShowModal(true)}>
-                    <Plus size={18} /> New Project
-                </button>
+  const removeMember = (index) => {
+    const updatedMembers = [...newProject.members];
+    updatedMembers.splice(index, 1);
+    setNewProject({ ...newProject, members: updatedMembers });
+  };
+
+  const filteredProjects = projects.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="projects-page">
+      <header className="page-header">
+        <div className="header-left">
+          <h1>My Squads</h1>
+          <p>Select a project to view impact metrics</p>
+        </div>
+        <div className="header-right">
+          <div className="search-bar glass">
+            <Search size={18} />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="manager-profile">
+            <div className="profile-info">
+              <span className="profile-name">{user?.name || 'Alex Rivera'}</span>
+              <span className="profile-role">{user?.role || 'Senior Manager'}</span>
             </div>
+            <div className="profile-avatar">
+              {(user?.name || 'Alex Rivera').split(' ').map(n => n[0]).join('')}
+            </div>
+            <button className="btn-logout" onClick={() => {
+              localStorage.removeItem('user');
+              navigate('/');
+            }}>Logout</button>
+          </div>
+        </div>
+      </header>
 
-            <div className="project-grid">
-                <AnimatePresence>
-                    {projects.map((project) => (
-                        <motion.div
-                            key={project.id}
-                            className="project-card glass-card"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ y: -5 }}
-                            onClick={() => navigate(`/dashboard/${project.id}`)}
-                        >
-                            <div className="card-icon">
-                                <CreditCard size={24} className="text-primary" />
-                            </div>
-                            <h3>{project.name}</h3>
-                            <div className="card-meta">
-                                <span><User size={14} /> {project.members} Members</span>
-                                <span>Synced {project.lastSync}</span>
-                            </div>
-                            <div className="card-footer">
-                                <span className="view-link">View Dashboard <ChevronRight size={16} /></span>
-                            </div>
-                        </motion.div>
+      <div className="actions-bar">
+        <div className="view-toggles">
+          <button className="btn-icon active"><LayoutGrid size={20} /></button>
+          <button className="btn-icon"><List size={20} /></button>
+        </div>
+        <button className="btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={18} /> New Project
+        </button>
+      </div>
+
+      <div className="project-grid">
+        {loading ? (
+          <div className="loading-state glass-card">
+            <div className="spinner"></div>
+            <p>Syncing Squads...</p>
+          </div>
+        ) : (
+          <AnimatePresence>
+            {filteredProjects.map((project) => (
+              <motion.div
+                key={project.id}
+                className="project-card glass-card"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ y: -5 }}
+                onClick={() => navigate(`/dashboard/${project.id}`)}
+              >
+                <div className="card-icon">
+                  <CreditCard size={24} className="text-primary" />
+                </div>
+                <h3>{project.name}</h3>
+                <div className="card-meta">
+                  <span><User size={14} /> {Array.isArray(project.members) ? project.members.length : project.members} Members</span>
+                  <span>Synced {project.lastSync || 'Recently'}</span>
+                </div>
+                <div className="card-footer">
+                  <span className="view-link">View Dashboard <ChevronRight size={16} /></span>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Create Project Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <div className="modal-overlay">
+            <motion.div
+              className="modal-content glass-card"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+            >
+              <div className="modal-header">
+                <h2>Create New Project</h2>
+                <button className="btn-close" onClick={() => setShowModal(false)}><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleCreateProject} className="modal-form">
+                <div className="form-group">
+                  <label>Project Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Venusync Core"
+                    value={newProject.name}
+                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="members-section">
+                  <label>Add Team Members</label>
+                  <div className="member-input-row">
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={currentMember.name}
+                      onChange={(e) => setCurrentMember({ ...currentMember, name: e.target.value })}
+                    />
+                    <div className="input-with-icon">
+                      <Github size={16} />
+                      <input
+                        type="text"
+                        placeholder="GitHub Username"
+                        value={currentMember.github}
+                        onChange={(e) => setCurrentMember({ ...currentMember, github: e.target.value })}
+                      />
+                    </div>
+                    <div className="input-with-icon">
+                      <Slack size={16} />
+                      <input
+                        type="text"
+                        placeholder="Slack ID"
+                        value={currentMember.slack}
+                        onChange={(e) => setCurrentMember({ ...currentMember, slack: e.target.value })}
+                      />
+                    </div>
+                    <button type="button" className="btn-add" onClick={addMember}>
+                      <Plus size={20} />
+                    </button>
+                  </div>
+
+                  <div className="members-list">
+                    {newProject.members.map((m, i) => (
+                      <div key={i} className="member-tag glass">
+                        <span>{m.name}</span>
+                        <button type="button" onClick={() => removeMember(i)}><X size={14} /></button>
+                      </div>
                     ))}
-                </AnimatePresence>
-            </div>
+                  </div>
+                </div>
 
-            {/* Create Project Modal */}
-            <AnimatePresence>
-                {showModal && (
-                    <div className="modal-overlay">
-                        <motion.div
-                            className="modal-content glass-card"
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 50 }}
-                        >
-                            <div className="modal-header">
-                                <h2>Create New Project</h2>
-                                <button className="btn-close" onClick={() => setShowModal(false)}><X size={20} /></button>
-                            </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={!newProject.name}>
+                    Initialize Project
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-                            <form onSubmit={handleCreateProject} className="modal-form">
-                                <div className="form-group">
-                                    <label>Project Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Venusync Core"
-                                        value={newProject.name}
-                                        onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="members-section">
-                                    <label>Add Team Members</label>
-                                    <div className="member-input-row">
-                                        <input
-                                            type="text"
-                                            placeholder="Name"
-                                            value={currentMember.name}
-                                            onChange={(e) => setCurrentMember({ ...currentMember, name: e.target.value })}
-                                        />
-                                        <div className="input-with-icon">
-                                            <Github size={16} />
-                                            <input
-                                                type="text"
-                                                placeholder="GitHub Username"
-                                                value={currentMember.github}
-                                                onChange={(e) => setCurrentMember({ ...currentMember, github: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="input-with-icon">
-                                            <Slack size={16} />
-                                            <input
-                                                type="text"
-                                                placeholder="Slack ID"
-                                                value={currentMember.slack}
-                                                onChange={(e) => setCurrentMember({ ...currentMember, slack: e.target.value })}
-                                            />
-                                        </div>
-                                        <button type="button" className="btn-add" onClick={addMember}>
-                                            <Plus size={20} />
-                                        </button>
-                                    </div>
-
-                                    <div className="members-list">
-                                        {newProject.members.map((m, i) => (
-                                            <div key={i} className="member-tag glass">
-                                                <span>{m.name}</span>
-                                                <button type="button" onClick={() => removeMember(i)}><X size={14} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="modal-footer">
-                                    <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                    <button type="submit" className="btn-primary" disabled={!newProject.name}>
-                                        Initialize Project
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            <style jsx>{`
+      <style jsx>{`
         .projects-page {
           padding: 40px 80px;
           min-height: 100vh;
@@ -280,6 +327,23 @@ const ProjectSelection = () => {
           justify-content: center;
           font-weight: 700;
           font-size: 0.9rem;
+        }
+
+        .btn-logout {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--glass-border);
+          color: var(--text-muted);
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          cursor: pointer;
+          margin-left: 10px;
+        }
+
+        .btn-logout:hover {
+          background: rgba(234, 67, 53, 0.1);
+          color: #ea4335;
+          border-color: rgba(234, 67, 53, 0.2);
         }
 
         .actions-bar {
@@ -501,9 +565,32 @@ const ProjectSelection = () => {
           .projects-page { padding: 40px; }
           .member-input-row { grid-template-columns: 1fr; }
         }
+
+        .loading-state {
+          grid-column: 1 / -1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px;
+          gap: 20px;
+        }
+
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.1);
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default ProjectSelection;

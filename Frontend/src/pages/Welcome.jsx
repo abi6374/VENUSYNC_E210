@@ -1,128 +1,224 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, Github, Slack, Zap, BarChart3, Users } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Github, Slack, Zap, BarChart3, Users, Mail, User, Lock, ChevronDown, AlertCircle } from 'lucide-react';
+import axios from 'axios';
 
 const Welcome = () => {
-    const [isLogin, setIsLogin] = useState(true);
-    const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [role, setRole] = useState('Super Admin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    const handleAuth = (e) => {
-        e.preventDefault();
-        // Simulate auth
-        navigate('/projects');
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const payload = isLogin ? { email, password } : { name, email, password, role };
+
+      const response = await axios.post(endpoint, payload);
+
+      // Store user info
+      localStorage.setItem('user', JSON.stringify(response.data));
+
+      navigate('/projects');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateEmail = (val) => {
+    setEmail(val);
+    if (isLogin) return;
+
+    const patterns = {
+      'Super Admin': /\.admin@gamil\.com$/,
+      'Manager': /\.manager@gmil\.com$/,
+      'Team Lead': /\.tl@gamil\.com$/
     };
 
-    return (
-        <div className="welcome-page">
-            {/* Animated Background Elements */}
-            <div className="bg-gradient-sphere sphere-1"></div>
-            <div className="bg-gradient-sphere sphere-2"></div>
+    if (val && !patterns[role].test(val)) {
+      setError(`Email must end with ${role === 'Super Admin' ? '.admin@gamil.com' : role === 'Manager' ? '.manager@gmil.com' : '.tl@gamil.com'}`);
+    } else {
+      setError('');
+    }
+  };
 
-            <nav className="navbar glass">
-                <div className="nav-logo">
-                    <ShieldCheck className="text-primary" size={32} />
-                    <span>Venusync</span>
+  return (
+    <div className="welcome-page">
+      {/* Animated Background Elements */}
+      <div className="bg-gradient-sphere sphere-1"></div>
+      <div className="bg-gradient-sphere sphere-2"></div>
+
+      <nav className="navbar glass">
+        <div className="nav-logo">
+          <ShieldCheck className="text-primary" size={32} />
+          <span>Venusync</span>
+        </div>
+        <div className="nav-links">
+          <button className="btn-primary" onClick={() => setIsLogin(true)}>Login</button>
+          <button className="btn-primary" onClick={() => setIsLogin(false)}>Get Started</button>
+        </div>
+      </nav>
+
+      <main className="hero-section">
+        <div className="hero-content">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            Quantify Impact, <br />
+            <span className="text-gradient">Beyond the Noise.</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="hero-subtitle"
+          >
+            Empower your engineering teams with data-driven insights.
+            Identify silent architects and bridge the gap between activity and true execution.
+          </motion.p>
+
+          <motion.div
+            className="feature-badges"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="badge"><Github size={16} /> GitHub Insights</div>
+            <div className="badge"><Slack size={16} /> Slack Analytics</div>
+            <div className="badge"><Zap size={16} /> ML Rankings</div>
+          </motion.div>
+        </div>
+
+        <motion.div
+          className="auth-container glass-card"
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <div className="auth-header">
+            <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+            <p>{isLogin ? 'Login to manage your squads' : 'Start monitoring team impact today'}</p>
+          </div>
+
+          <form onSubmit={handleAuth} className="auth-form">
+            {error && (
+              <div className="error-message glass">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {!isLogin && (
+              <>
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <div className="input-with-icon">
+                    <User size={18} />
+                    <input
+                      type="text"
+                      placeholder="Your Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="nav-links">
-                    <button className="btn-ghost" onClick={() => setIsLogin(true)}>Login</button>
-                    <button className="btn-primary" onClick={() => setIsLogin(false)}>Get Started</button>
+                <div className="form-group">
+                  <label>Select Your Role</label>
+                  <div className="role-selector-grid">
+                    {['Super Admin', 'Manager', 'Team Lead'].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        className={`role-btn ${role === r ? 'active' : ''}`}
+                        onClick={() => {
+                          setRole(r);
+                          setError('');
+                        }}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-            </nav>
+              </>
+            )}
 
-            <main className="hero-section">
-                <div className="hero-content">
-                    <motion.h1
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                    >
-                        Quantify Impact, <br />
-                        <span className="text-gradient">Beyond the Noise.</span>
-                    </motion.h1>
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.2 }}
-                        className="hero-subtitle"
-                    >
-                        Empower your engineering teams with data-driven insights.
-                        Identify silent architects and bridge the gap between activity and true execution.
-                    </motion.p>
+            <div className="form-group">
+              <label>Work Email</label>
+              <div className="input-with-icon">
+                <Mail size={18} />
+                <input
+                  type="email"
+                  placeholder={isLogin ? "name@gmail.com" : `name.${role === 'Super Admin' ? 'admin' : role === 'Manager' ? 'manager' : 'tl'}@gmail.com`}
+                  value={email}
+                  onChange={(e) => validateEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
 
-                    <motion.div
-                        className="feature-badges"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.4 }}
-                    >
-                        <div className="badge"><Github size={16} /> GitHub Insights</div>
-                        <div className="badge"><Slack size={16} /> Slack Analytics</div>
-                        <div className="badge"><Zap size={16} /> ML Rankings</div>
-                    </motion.div>
-                </div>
+            <div className="form-group">
+              <label>Password</label>
+              <div className="input-with-icon">
+                <Lock size={18} />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
 
-                <motion.div
-                    className="auth-container glass-card"
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8 }}
-                >
-                    <div className="auth-header">
-                        <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-                        <p>{isLogin ? 'Login to manage your squads' : 'Start monitoring team impact today'}</p>
-                    </div>
+            <button type="submit" className="btn-primary w-full" disabled={loading || !!error && !isLogin}>
+              {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+              {!loading && <ArrowRight size={18} />}
+            </button>
+          </form>
 
-                    <form onSubmit={handleAuth} className="auth-form">
-                        {!isLogin && (
-                            <div className="form-group">
-                                <label>Full Name</label>
-                                <input type="text" placeholder="Manager Name" required />
-                            </div>
-                        )}
-                        <div className="form-group">
-                            <label>Work Email</label>
-                            <input type="email" placeholder="name@company.com" required />
-                        </div>
-                        <div className="form-group">
-                            <label>Password</label>
-                            <input type="password" placeholder="••••••••" required />
-                        </div>
+          <p className="auth-footer">
+            {isLogin ? "Don't have an account?" : "Already have an account?"}
+            <button onClick={() => setIsLogin(!isLogin)}>
+              {isLogin ? 'Sign Up' : 'Login'}
+            </button>
+          </p>
+        </motion.div>
+      </main>
 
-                        <button type="submit" className="btn-primary w-full">
-                            {isLogin ? 'Sign In' : 'Create Admin Account'}
-                            <ArrowRight size={18} />
-                        </button>
-                    </form>
+      <section className="stats-preview">
+        <div className="stat-card glass">
+          <Users className="text-primary" />
+          <h3>Scalable</h3>
+          <p>Works for teams of 3 to 50+ without noise.</p>
+        </div>
+        <div className="stat-card glass">
+          <BarChart3 className="text-secondary" />
+          <h3>Fair Metrics</h3>
+          <p>Scoring logic that values quality over raw volume.</p>
+        </div>
+        <div className="stat-card glass">
+          <ShieldCheck className="text-accent" />
+          <h3>Secure</h3>
+          <p>Enterprise-grade data encryption & privacy.</p>
+        </div>
+      </section>
 
-                    <p className="auth-footer">
-                        {isLogin ? "Don't have an account?" : "Already have an account?"}
-                        <button onClick={() => setIsLogin(!isLogin)}>
-                            {isLogin ? 'Sign Up' : 'Login'}
-                        </button>
-                    </p>
-                </motion.div>
-            </main>
-
-            <section className="stats-preview">
-                <div className="stat-card glass">
-                    <Users className="text-primary" />
-                    <h3>Scalable</h3>
-                    <p>Works for teams of 3 to 50+ without noise.</p>
-                </div>
-                <div className="stat-card glass">
-                    <BarChart3 className="text-secondary" />
-                    <h3>Fair Metrics</h3>
-                    <p>Scoring logic that values quality over raw volume.</p>
-                </div>
-                <div className="stat-card glass">
-                    <ShieldCheck className="text-accent" />
-                    <h3>Secure</h3>
-                    <p>Enterprise-grade data encryption & privacy.</p>
-                </div>
-            </section>
-
-            <style jsx>{`
+      <style jsx>{`
         .welcome-page {
           min-height: 100vh;
           padding: 20px 80px;
@@ -279,6 +375,58 @@ const Welcome = () => {
           background: rgba(255, 255, 255, 0.06);
         }
 
+        .input-with-icon {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .input-with-icon :global(svg) {
+          position: absolute;
+          left: 16px;
+          color: var(--text-muted);
+        }
+
+        .input-with-icon input {
+          width: 100%;
+          padding-left: 50px !important;
+        }
+
+        .role-selector-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+
+        .role-btn {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--glass-border);
+          color: var(--text-dim);
+          padding: 10px 5px;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: var(--transition-smooth);
+        }
+
+        .role-btn.active {
+          background: var(--primary);
+          border-color: var(--primary);
+          color: white;
+        }
+
+        .error-message {
+          background: rgba(234, 67, 53, 0.1);
+          border: 1px solid rgba(234, 67, 53, 0.2);
+          color: #ea4335;
+          padding: 12px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 0.85rem;
+        }
+
         .w-full { width: 100%; justify-content: center; margin-top: 10px; }
 
         .auth-footer {
@@ -328,8 +476,8 @@ const Welcome = () => {
           .auth-container { max-width: 500px; margin: 0 auto; }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default Welcome;

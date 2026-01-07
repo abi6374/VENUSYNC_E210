@@ -1,208 +1,238 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
-    BarChart3,
-    TrendingUp,
-    Users,
-    FileText,
-    Download,
-    Calendar,
-    Filter,
-    ArrowLeft,
-    Github,
-    MessageSquare,
-    Award,
-    Zap
+  BarChart3,
+  TrendingUp,
+  Users,
+  FileText,
+  Download,
+  Calendar,
+  Filter,
+  ArrowLeft,
+  Github,
+  MessageSquare,
+  Award,
+  Zap
 } from 'lucide-react';
 import {
-    ScatterChart,
-    Scatter,
-    XAxis,
-    YAxis,
-    ZAxis,
-    Tooltip,
-    ResponsiveContainer,
-    Cell
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  ZAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
 } from 'recharts';
 
 const Dashboard = () => {
-    const { projectId } = useParams();
-    const navigate = useNavigate();
-    const [timeRange, setTimeRange] = useState('30d');
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const [timeRange, setTimeRange] = useState('30d');
+  const [teamData, setTeamData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
-    // Simulated data for "Loud vs Quiet" developers
-    const teamData = [
-        { name: 'Sarah L.', visibility: 95, impact: 40, role: 'Frontend Dev', type: 'High Visibility' },
-        { name: 'David K.', visibility: 30, impact: 88, role: 'Architect', type: 'Silent Architect' },
-        { name: 'Elena R.', visibility: 70, impact: 75, role: 'Fullstack', type: 'High Impact' },
-        { name: 'Marcus T.', visibility: 85, impact: 30, role: 'Junior Dev', type: 'High Visibility' },
-        { name: 'Jamie W.', visibility: 15, impact: 92, role: 'Security lead', type: 'Silent Architect' },
-        { name: 'Alex P.', visibility: 50, impact: 55, role: 'DevOps', type: 'Balanced' },
-        { name: 'Sam B.', visibility: 20, impact: 85, role: 'Backend Eng', type: 'Silent Architect' },
-    ];
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) setUser(JSON.parse(savedUser));
+    fetchAnalytics();
+  }, [projectId]);
 
-    const CustomTooltip = ({ active, payload }) => {
-        if (active && payload && payload.length) {
-            const data = payload[0].payload;
-            return (
-                <div className="custom-tooltip glass">
-                    <p className="tooltip-name">{data.name}</p>
-                    <p className="tooltip-role">{data.role}</p>
-                    <div className="tooltip-stats">
-                        <span className="stat-label">Visibility: {data.visibility}%</span>
-                        <span className="stat-label">Impact: {data.impact}%</span>
-                    </div>
-                    <span className={`badge-type ${data.type.replace(' ', '-').toLowerCase()}`}>
-                        {data.type}
-                    </span>
-                </div>
-            );
-        }
-        return null;
-    };
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/analytics/${projectId}`);
+      setTeamData(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setLoading(false);
+    }
+  };
 
-    return (
-        <div className="dashboard-page">
-            <header className="dash-header glass">
-                <div className="header-left">
-                    <button className="btn-back" onClick={() => navigate('/projects')}>
-                        <ArrowLeft size={18} />
-                    </button>
-                    <div className="project-title">
-                        <span className="breadcrumb">Projects / Cloud Infrastructure</span>
-                        <h1>Contribution Analytics</h1>
-                    </div>
-                </div>
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="custom-tooltip glass">
+          <p className="tooltip-name">{data.name}</p>
+          <p className="tooltip-role">{data.role}</p>
+          <div className="tooltip-stats">
+            <span className="stat-label">Visibility: {data.visibility}%</span>
+            <span className="stat-label">Impact: {data.impact}%</span>
+          </div>
+          <span className={`badge-type ${data.type.replace(' ', '-').toLowerCase()}`}>
+            {data.type}
+          </span>
+        </div>
+      );
+    }
+    return null;
+  };
 
-                <div className="header-actions">
-                    <div className="range-selector glass">
-                        <Calendar size={16} />
-                        <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="90d">Last 90 Days</option>
-                            <option value="custom">Custom Range</option>
-                        </select>
-                    </div>
-                    <button className="btn-secondary"><FileText size={18} /> Report</button>
-                    <button className="btn-primary"><Download size={18} /> Export PDF</button>
-                </div>
-            </header>
+  return (
+    <div className="dashboard-page">
+      <header className="dash-header glass">
+        <div className="header-left">
+          <button className="btn-back" onClick={() => navigate('/projects')}>
+            <ArrowLeft size={18} />
+          </button>
+          <div className="project-title">
+            <span className="breadcrumb">Projects / Cloud Infrastructure</span>
+            <h1>Contribution Analytics</h1>
+          </div>
+        </div>
 
-            <div className="stats-row">
-                <div className="mini-card glass-card">
-                    <TrendingUp className="text-secondary" />
-                    <div className="card-data">
-                        <span className="label">Team Productivity</span>
-                        <span className="value">+12.5%</span>
-                    </div>
-                </div>
-                <div className="mini-card glass-card">
-                    <Zap className="text-accent" />
-                    <div className="card-data">
-                        <span className="label">Efficiency Score</span>
-                        <span className="value">84/100</span>
-                    </div>
-                </div>
-                <div className="mini-card glass-card">
-                    <Users className="text-primary" />
-                    <div className="card-data">
-                        <span className="label">Active Squad</span>
-                        <span className="value">12 members</span>
-                    </div>
-                </div>
+        <div className="header-actions">
+          <div className="range-selector glass">
+            <Calendar size={16} />
+            <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+          <button className="btn-secondary"><FileText size={18} /> Report</button>
+          <button className="btn-primary"><Download size={18} /> Export PDF</button>
+
+          <div className="user-profile glass">
+            <div className="user-avatar">
+              {(user?.name || 'AR').split(' ').map(n => n[0]).join('')}
             </div>
+            <div className="user-info">
+              <span className="name">{user?.name || 'Alex'}</span>
+              <span className="role">{user?.role || 'Admin'}</span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-            <main className="dashboard-grid">
-                <section className="chart-section glass-card">
-                    <div className="section-header">
-                        <h3>Visibility vs. Impact</h3>
-                        <p>Identifying Silent Architects and high-noise contributors</p>
-                    </div>
-                    <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={400}>
-                            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                                <XAxis
-                                    type="number"
-                                    dataKey="visibility"
-                                    name="Visibility"
-                                    unit="%"
-                                    stroke="var(--text-muted)"
-                                    label={{ value: 'Perceived Visibility', position: 'bottom', offset: 0, fill: 'var(--text-dim)' }}
-                                />
-                                <YAxis
-                                    type="number"
-                                    dataKey="impact"
-                                    name="Impact"
-                                    unit="%"
-                                    stroke="var(--text-muted)"
-                                    label={{ value: 'Actual Impact', angle: -90, position: 'left', fill: 'var(--text-dim)' }}
-                                />
-                                <ZAxis type="number" range={[100, 200]} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                                <Scatter name="Team" data={teamData}>
-                                    {teamData.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={entry.impact > 80 && entry.visibility < 40 ? 'var(--secondary)' :
-                                                entry.visibility > 80 && entry.impact < 50 ? 'var(--danger)' :
-                                                    'var(--primary)'}
-                                        />
-                                    ))}
-                                </Scatter>
-                            </ScatterChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div className="chart-legend">
-                        <div className="legend-item"><span className="dot silent"></span> Silent Architect</div>
-                        <div className="legend-item"><span className="dot noisy"></span> High Noise</div>
-                        <div className="legend-item"><span className="dot balanced"></span> Core Contributor</div>
-                    </div>
-                </section>
+      <div className="stats-row">
+        <div className="mini-card glass-card">
+          <TrendingUp className="text-secondary" />
+          <div className="card-data">
+            <span className="label">Team Productivity</span>
+            <span className="value">+12.5%</span>
+          </div>
+        </div>
+        <div className="mini-card glass-card">
+          <Zap className="text-accent" />
+          <div className="card-data">
+            <span className="label">Efficiency Score</span>
+            <span className="value">84/100</span>
+          </div>
+        </div>
+        <div className="mini-card glass-card">
+          <Users className="text-primary" />
+          <div className="card-data">
+            <span className="label">Active Squad</span>
+            <span className="value">12 members</span>
+          </div>
+        </div>
+      </div>
 
-                <section className="leaderboard-section glass-card">
-                    <div className="section-header">
-                        <h3>Top Contributors</h3>
-                        <button className="btn-icon"><Filter size={16} /></button>
-                    </div>
-                    <div className="contributor-list">
-                        {teamData.sort((a, b) => b.impact - a.impact).map((member, i) => (
-                            <motion.div
-                                key={i}
-                                className="member-row"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.1 }}
-                            >
-                                <div className="rank">#{i + 1}</div>
-                                <div className="member-info">
-                                    <p className="name">{member.name}</p>
-                                    <p className="role">{member.role}</p>
-                                </div>
-                                <div className="member-metrics">
-                                    <div className="metric-group">
-                                        <Github size={12} className="text-muted" />
-                                        <span>{Math.floor(member.impact * 1.5)}</span>
-                                    </div>
-                                    <div className="metric-group">
-                                        <MessageSquare size={12} className="text-muted" />
-                                        <span>{Math.floor(member.visibility * 2)}</span>
-                                    </div>
-                                </div>
-                                <div className="impact-score">
-                                    <span className="score">{member.impact}</span>
-                                    <div className="score-bar">
-                                        <div className="bar-fill" style={{ width: `${member.impact}%` }}></div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                </section>
-            </main>
+      <main className="dashboard-grid">
+        <section className="chart-section glass-card">
+          <div className="section-header">
+            <h3>Visibility vs. Impact</h3>
+            <p>Identifying Silent Architects and high-noise contributors</p>
+          </div>
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Calculating Impact Metrics...</p>
+            </div>
+          ) : (
+            <>
+              <div className="chart-container">
+                <ResponsiveContainer width="100%" height={400}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <XAxis
+                      type="number"
+                      dataKey="visibility"
+                      name="Visibility"
+                      unit="%"
+                      stroke="var(--text-muted)"
+                      label={{ value: 'Perceived Visibility', position: 'bottom', offset: 0, fill: 'var(--text-dim)' }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="impact"
+                      name="Impact"
+                      unit="%"
+                      stroke="var(--text-muted)"
+                      label={{ value: 'Actual Impact', angle: -90, position: 'left', fill: 'var(--text-dim)' }}
+                    />
+                    <ZAxis type="number" range={[100, 200]} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                    <Scatter name="Team" data={teamData}>
+                      {teamData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.impact > 80 && entry.visibility < 40 ? 'var(--secondary)' :
+                            entry.visibility > 80 && entry.impact < 50 ? 'var(--danger)' :
+                              'var(--primary)'}
+                        />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="chart-legend">
+                <div className="legend-item"><span className="dot silent"></span> Silent Architect</div>
+                <div className="legend-item"><span className="dot noisy"></span> High Noise</div>
+                <div className="legend-item"><span className="dot balanced"></span> Core Contributor</div>
+              </div>
+            </>
+          )}
+        </section>
 
-            <style jsx>{`
+        <section className="leaderboard-section glass-card">
+          <div className="section-header">
+            <h3>Top Contributors</h3>
+            <button className="btn-icon"><Filter size={16} /></button>
+          </div>
+          <div className="contributor-list">
+            {teamData.sort((a, b) => b.impact - a.impact).map((member, i) => (
+              <motion.div
+                key={i}
+                className="member-row"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <div className="rank">#{i + 1}</div>
+                <div className="member-info">
+                  <p className="name">{member.name}</p>
+                  <p className="role">{member.role}</p>
+                </div>
+                <div className="member-metrics">
+                  <div className="metric-group">
+                    <Github size={12} className="text-muted" />
+                    <span>{Math.floor(member.impact * 1.5)}</span>
+                  </div>
+                  <div className="metric-group">
+                    <MessageSquare size={12} className="text-muted" />
+                    <span>{Math.floor(member.visibility * 2)}</span>
+                  </div>
+                </div>
+                <div className="impact-score">
+                  <span className="score">{member.impact}</span>
+                  <div className="score-bar">
+                    <div className="bar-fill" style={{ width: `${member.impact}%` }}></div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <style jsx>{`
         .dashboard-page {
           padding: 30px;
           background: var(--bg-darker);
@@ -279,6 +309,41 @@ const Dashboard = () => {
           align-items: center;
           gap: 8px;
           font-weight: 500;
+        }
+
+        .user-profile {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 6px 16px;
+          border-radius: 12px;
+        }
+
+        .user-avatar {
+          width: 32px;
+          height: 32px;
+          background: var(--primary);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.8rem;
+          font-weight: 700;
+        }
+
+        .user-info {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .user-info .name {
+          font-size: 0.85rem;
+          font-weight: 600;
+        }
+
+        .user-info .role {
+          font-size: 0.7rem;
+          color: var(--text-muted);
         }
 
         .stats-row {
@@ -465,9 +530,32 @@ const Dashboard = () => {
         @media (max-width: 1100px) {
           .dashboard-grid { grid-template-columns: 1fr; }
         }
+
+        .loading-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px;
+          gap: 20px;
+          height: 400px;
+        }
+
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.1);
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default Dashboard;
