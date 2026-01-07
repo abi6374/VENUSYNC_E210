@@ -1,0 +1,7 @@
+node_modules/
+.env
+VENUSYNC.zip
+VENUSYNC_E210/
+dist/
+build/
+.DS_Store
