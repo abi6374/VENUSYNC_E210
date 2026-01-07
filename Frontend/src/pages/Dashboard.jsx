@@ -35,6 +35,26 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
+  const handleGenerateReport = () => {
+    const reportData = {
+      project: 'Cloud Infrastructure',
+      timeRange,
+      teamData,
+      generatedAt: new Date().toLocaleString()
+    };
+    const dataStr = JSON.stringify(reportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `venusync-report-${Date.now()}.json`;
+    link.click();
+  };
+
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -96,8 +116,8 @@ const Dashboard = () => {
               <option value="custom">Custom Range</option>
             </select>
           </div>
-          <button className="btn-secondary"><FileText size={18} /> Report</button>
-          <button className="btn-primary"><Download size={18} /> Export PDF</button>
+          <button className="btn-secondary" onClick={handleGenerateReport}><FileText size={18} /> Report</button>
+          <button className="btn-primary" onClick={handleExportPDF}><Download size={18} /> Export PDF</button>
 
           <div className="user-profile glass">
             <div className="user-avatar">
@@ -296,6 +316,12 @@ const Dashboard = () => {
           font-weight: 500;
           outline: none;
           cursor: pointer;
+        }
+
+        .range-selector select option {
+          background: #1a1a2e;
+          color: white;
+          padding: 10px;
         }
 
         .btn-secondary {

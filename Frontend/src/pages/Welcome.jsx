@@ -36,23 +36,6 @@ const Welcome = () => {
     }
   };
 
-  const validateEmail = (val) => {
-    setEmail(val);
-    if (isLogin) return;
-
-    const patterns = {
-      'Super Admin': /\.admin@gamil\.com$/,
-      'Manager': /\.manager@gmil\.com$/,
-      'Team Lead': /\.tl@gamil\.com$/
-    };
-
-    if (val && !patterns[role].test(val)) {
-      setError(`Email must end with ${role === 'Super Admin' ? '.admin@gamil.com' : role === 'Manager' ? '.manager@gmil.com' : '.tl@gamil.com'}`);
-    } else {
-      setError('');
-    }
-  };
-
   return (
     <div className="welcome-page">
       {/* Animated Background Elements */}
@@ -163,9 +146,9 @@ const Welcome = () => {
                 <Mail size={18} />
                 <input
                   type="email"
-                  placeholder={isLogin ? "name@gmail.com" : `name.${role === 'Super Admin' ? 'admin' : role === 'Manager' ? 'manager' : 'tl'}@gmail.com`}
+                  placeholder={isLogin ? "name@gmail.com" : "your.email@gmail.com"}
                   value={email}
-                  onChange={(e) => validateEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
