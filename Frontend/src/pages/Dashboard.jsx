@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -14,7 +14,12 @@ import {
   Github,
   MessageSquare,
   Award,
-  Zap
+  Zap,
+  Edit,
+  X,
+  Plus,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import {
   ScatterChart,
@@ -31,17 +36,56 @@ const Dashboard = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState('30d');
+
+  // Data State
+  const [project, setProject] = useState(null);
   const [teamData, setTeamData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [saving, setSaving] = useState(false);
 
+  // UI State
+  const [user, setUser] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMembers, setEditingMembers] = useState([]);
+
+  // Load User
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) setUser(JSON.parse(savedUser));
+  }, []);
+
+  // Fetch Data
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      // Parallel fetch: Project Details & Analytics
+      const [projectRes, analyticsRes] = await Promise.all([
+        axios.get(`/api/projects/${projectId}`),
+        axios.get(`/api/analytics/${projectId}`)
+      ]);
+
+      setProject(projectRes.data);
+      setTeamData(analyticsRes.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) fetchData();
+  }, [projectId]);
+
+  // Handlers
   const handleExportPDF = () => {
     window.print();
   };
 
   const handleGenerateReport = () => {
     const reportData = {
-      project: 'Cloud Infrastructure',
+      project: project?.name,
       timeRange,
       teamData,
       generatedAt: new Date().toLocaleString()
@@ -55,21 +99,48 @@ const Dashboard = () => {
     link.click();
   };
 
-  React.useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-    fetchAnalytics();
-  }, [projectId]);
+  // Edit Team Logic
+  const openEditModal = () => {
+    // Deep copy to strictly avoid mutating project state directly
+    const membersCopy = project?.members ? project.members.map(m => ({ ...m })) : [];
+    setEditingMembers(membersCopy);
+    setShowEditModal(true);
+  };
 
-  const fetchAnalytics = async () => {
+  // ... (rest is same)
+
+
+  const handleAddMember = () => {
+    setEditingMembers([...editingMembers, { name: '', github: '', slack: '' }]);
+  };
+
+  const handleRemoveMember = (index) => {
+    const newMembers = [...editingMembers];
+    newMembers.splice(index, 1);
+    setEditingMembers(newMembers);
+  };
+
+  const handleMemberChange = (index, field, value) => {
+    const newMembers = editingMembers.map((member, i) => {
+      if (i === index) {
+        return { ...member, [field]: value };
+      }
+      return member;
+    });
+    setEditingMembers(newMembers);
+  };
+
+  const handleSaveTeam = async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`/api/analytics/${projectId}`);
-      setTeamData(response.data);
-      setLoading(false);
+      setSaving(true);
+      await axios.put(`/api/projects/${projectId}`, { members: editingMembers });
+      setShowEditModal(false);
+      await fetchData(); // Wait for data refresh
+      setSaving(false);
     } catch (error) {
-      console.error('Error fetching analytics:', error);
-      setLoading(false);
+      console.error("Failed to update team", error);
+      alert("Failed to save changes. Please check the console for details.");
+      setSaving(false);
     }
   };
 
@@ -84,7 +155,7 @@ const Dashboard = () => {
             <span className="stat-label">Visibility: {data.visibility}%</span>
             <span className="stat-label">Impact: {data.impact}%</span>
           </div>
-          <span className={`badge-type ${data.type.replace(' ', '-').toLowerCase()}`}>
+          <span className={`badge-type ${data.type ? data.type.replace(/\s+/g, '-').toLowerCase() : ''}`}>
             {data.type}
           </span>
         </div>
@@ -101,23 +172,27 @@ const Dashboard = () => {
             <ArrowLeft size={18} />
           </button>
           <div className="project-title">
-            <span className="breadcrumb">Projects / Cloud Infrastructure</span>
+            <span className="breadcrumb">Projects / {project?.name || 'Loading...'}</span>
             <h1>Contribution Analytics</h1>
           </div>
         </div>
 
         <div className="header-actions">
-          <div className="range-selector glass">
-            <Calendar size={16} />
-            <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </div>
-          <button className="btn-secondary" onClick={handleGenerateReport}><FileText size={18} /> Report</button>
-          <button className="btn-primary" onClick={handleExportPDF}><Download size={18} /> Export PDF</button>
+          <button className="btn-secondary" onClick={fetchData} title="Refresh Data">
+            <RefreshCw size={18} />
+          </button>
+
+          <button className="btn-secondary" onClick={openEditModal}>
+            <Edit size={18} /> Edit Team
+          </button>
+
+          <button className="btn-secondary" onClick={handleGenerateReport}>
+            <FileText size={18} /> Report
+          </button>
+
+          <button className="btn-primary" onClick={handleExportPDF}>
+            <Download size={18} /> Export PDF
+          </button>
 
           <div className="user-profile glass">
             <div className="user-avatar">
@@ -136,7 +211,9 @@ const Dashboard = () => {
           <TrendingUp className="text-secondary" />
           <div className="card-data">
             <span className="label">Team Productivity</span>
-            <span className="value">+12.5%</span>
+            <span className="value">
+              {teamData.length > 0 ? `+${Math.floor(teamData.reduce((acc, curr) => acc + curr.impact, 0) / teamData.length)}%` : '0%'}
+            </span>
           </div>
         </div>
         <div className="mini-card glass-card">
@@ -150,7 +227,7 @@ const Dashboard = () => {
           <Users className="text-primary" />
           <div className="card-data">
             <span className="label">Active Squad</span>
-            <span className="value">12 members</span>
+            <span className="value">{teamData.length} members</span>
           </div>
         </div>
       </div>
@@ -175,6 +252,7 @@ const Dashboard = () => {
                       type="number"
                       dataKey="visibility"
                       name="Visibility"
+                      domain={[0, 100]}
                       unit="%"
                       stroke="var(--text-muted)"
                       label={{ value: 'Perceived Visibility', position: 'bottom', offset: 0, fill: 'var(--text-dim)' }}
@@ -183,19 +261,22 @@ const Dashboard = () => {
                       type="number"
                       dataKey="impact"
                       name="Impact"
+                      domain={[0, 100]}
                       unit="%"
                       stroke="var(--text-muted)"
                       label={{ value: 'Actual Impact', angle: -90, position: 'left', fill: 'var(--text-dim)' }}
                     />
-                    <ZAxis type="number" range={[100, 200]} />
+                    <ZAxis type="number" range={[100, 300]} />
                     <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
                     <Scatter name="Team" data={teamData}>
                       {teamData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={entry.impact > 80 && entry.visibility < 40 ? 'var(--secondary)' :
-                            entry.visibility > 80 && entry.impact < 50 ? 'var(--danger)' :
-                              'var(--primary)'}
+                          fill={
+                            entry.impact > 60 && entry.visibility < 40 ? '#34a853' : // Silent Architect (Green)
+                              entry.visibility > 70 && entry.impact < 50 ? '#ea4335' : // High Noise (Red)
+                                '#4285f4' // Core (Blue)
+                          }
                         />
                       ))}
                     </Scatter>
@@ -228,31 +309,92 @@ const Dashboard = () => {
                 <div className="rank">#{i + 1}</div>
                 <div className="member-info">
                   <p className="name">{member.name}</p>
-                  <p className="role">{member.role}</p>
+                  <p className="role">{member.type || member.role}</p>
                 </div>
                 <div className="member-metrics">
-                  <div className="metric-group">
-                    <Github size={12} className="text-muted" />
-                    <span>{Math.floor(member.impact * 1.5)}</span>
+                  <div className="metric-group" title="Impact Score">
+                    <Award size={14} className="text-secondary" />
+                    <span className="metric-val">{member.impact}</span>
                   </div>
-                  <div className="metric-group">
-                    <MessageSquare size={12} className="text-muted" />
-                    <span>{Math.floor(member.visibility * 2)}</span>
+                  <div className="metric-group" title="Github Activity">
+                    <Github size={14} className="text-muted" />
+                    <span className="metric-val">{member.visibility}%</span>
                   </div>
                 </div>
                 <div className="impact-score">
-                  <span className="score">{member.impact}</span>
                   <div className="score-bar">
                     <div className="bar-fill" style={{ width: `${member.impact}%` }}></div>
                   </div>
                 </div>
               </motion.div>
             ))}
+            {teamData.length === 0 && !loading && (
+              <div className="empty-state">
+                <p>No contributors found.</p>
+              </div>
+            )}
           </div>
         </section>
       </main>
 
+      {/* Edit Team Modal */}
+      <AnimatePresence>
+        {showEditModal && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="modal glass-card"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <div className="modal-header">
+                <h2>Edit Team Members</h2>
+                <button onClick={() => setShowEditModal(false)}><X size={20} /></button>
+              </div>
+              <div className="modal-body">
+                <div className="members-list">
+                  {editingMembers.map((member, idx) => (
+                    <div key={idx} className="member-input-row">
+                      <input
+                        type="text"
+                        placeholder="Name"
+                        value={member.name}
+                        onChange={(e) => handleMemberChange(idx, 'name', e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="GitHub Username"
+                        value={member.github}
+                        onChange={(e) => handleMemberChange(idx, 'github', e.target.value)}
+                      />
+                      <button className="btn-icon danger" onClick={() => handleRemoveMember(idx)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button className="btn-dashed" onClick={handleAddMember}>
+                  <Plus size={16} /> Add Member
+                </button>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-secondary" onClick={() => setShowEditModal(false)} disabled={saving}>Cancel</button>
+                <button className="btn-primary" onClick={handleSaveTeam} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style jsx>{`
+        /* Reuse existing styles plus Modal Styles */
         .dashboard-page {
           padding: 30px;
           background: var(--bg-darker);
@@ -300,30 +442,6 @@ const Dashboard = () => {
           gap: 12px;
         }
 
-        .range-selector {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 0 16px;
-          border-radius: 12px;
-        }
-
-        .range-selector select {
-          background: transparent;
-          border: none;
-          color: white;
-          font-size: 0.9rem;
-          font-weight: 500;
-          outline: none;
-          cursor: pointer;
-        }
-
-        .range-selector select option {
-          background: #1a1a2e;
-          color: white;
-          padding: 10px;
-        }
-
         .btn-secondary {
           background: rgba(255, 255, 255, 0.05);
           border: 1px solid var(--border-color);
@@ -335,6 +453,24 @@ const Dashboard = () => {
           align-items: center;
           gap: 8px;
           font-weight: 500;
+          transition: all 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
         }
 
         .user-profile {
@@ -362,15 +498,8 @@ const Dashboard = () => {
           flex-direction: column;
         }
 
-        .user-info .name {
-          font-size: 0.85rem;
-          font-weight: 600;
-        }
-
-        .user-info .role {
-          font-size: 0.7rem;
-          color: var(--text-muted);
-        }
+        .user-info .name { font-size: 0.85rem; font-weight: 600; }
+        .user-info .role { font-size: 0.7rem; color: var(--text-muted); }
 
         .stats-row {
           display: grid;
@@ -386,23 +515,9 @@ const Dashboard = () => {
           gap: 20px;
         }
 
-        .mini-card :global(svg) {
-          width: 32px;
-          height: 32px;
-        }
-
-        .card-data .label {
-          display: block;
-          color: var(--text-dim);
-          font-size: 0.9rem;
-          margin-bottom: 4px;
-        }
-
-        .card-data .value {
-          font-size: 1.8rem;
-          font-weight: 700;
-          font-family: 'Outfit';
-        }
+        .mini-card :global(svg) { width: 32px; height: 32px; }
+        .card-data .label { display: block; color: var(--text-dim); font-size: 0.9rem; margin-bottom: 4px; }
+        .card-data .value { font-size: 1.8rem; font-weight: 700; font-family: 'Outfit'; }
 
         .dashboard-grid {
           display: grid;
@@ -417,19 +532,10 @@ const Dashboard = () => {
           align-items: flex-start;
         }
 
-        .section-header h3 {
-          font-size: 1.25rem;
-          margin-bottom: 4px;
-        }
+        .section-header h3 { font-size: 1.25rem; margin-bottom: 4px; }
+        .section-header p { color: var(--text-muted); font-size: 0.9rem; }
 
-        .section-header p {
-          color: var(--text-muted);
-          font-size: 0.9rem;
-        }
-
-        .chart-container {
-          padding: 20px;
-        }
+        .chart-container { padding: 20px; }
 
         .chart-legend {
           display: flex;
@@ -440,30 +546,35 @@ const Dashboard = () => {
           border-top: 1px solid var(--border-color);
         }
 
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.85rem;
-          color: var(--text-dim);
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot.silent { background: #34a853; }
+        .dot.noisy { background: #ea4335; }
+        .dot.balanced { background: #4285f4; }
+        
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: var(--text-muted);
         }
-
-        .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
+        
+        .spinner {
+             width: 40px;
+             height: 40px;
+             border: 3px solid rgba(255, 255, 255, 0.1);
+             border-top-color: var(--primary);
+             border-radius: 50%;
+             animation: spin 1s linear infinite;
+             margin-bottom: 16px;
         }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .dot.silent { background: var(--secondary); }
-        .dot.noisy { background: var(--danger); }
-        .dot.balanced { background: var(--primary); }
-
-        .contributor-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
+        /* Contributor List */
+        .contributor-list { display: flex; flex-direction: column; gap: 16px; }
         .member-row {
           display: grid;
           grid-template-columns: 40px 1fr auto auto;
@@ -471,114 +582,134 @@ const Dashboard = () => {
           gap: 16px;
           padding: 12px;
           border-radius: 12px;
-          transition: var(--transition-smooth);
+          transition: 0.2s;
         }
+        .member-row:hover { background: rgba(255, 255, 255, 0.03); }
+        .rank { font-weight: 700; color: var(--text-muted); }
+        .member-info .name { font-weight: 600; font-size: 0.95rem; }
+        .member-info .role { font-size: 0.8rem; color: var(--text-muted); }
+        
+        .member-metrics { display: flex; gap: 16px; min-width: 100px;}
+        .metric-group { display: flex; align-items: center; gap: 6px; }
+        .metric-val { font-weight: 600; font-size: 0.9rem; }
 
-        .member-row:hover {
-          background: rgba(255, 255, 255, 0.03);
-        }
-
-        .rank {
-          font-weight: 700;
-          color: var(--text-muted);
-        }
-
-        .member-info .name {
-          font-weight: 600;
-          font-size: 0.95rem;
-        }
-
-        .member-info .role {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .member-metrics {
-          display: flex;
-          gap: 12px;
-        }
-
-        .metric-group {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 0.8rem;
-          color: var(--text-dim);
-        }
-
-        .impact-score {
-          width: 80px;
-          text-align: right;
-        }
-
-        .impact-score .score {
-          display: block;
-          font-weight: 700;
-          margin-bottom: 4px;
-        }
-
+        .impact-score { width: 80px; }
         .score-bar {
           height: 4px;
           background: rgba(255, 255, 255, 0.05);
           border-radius: 2px;
           overflow: hidden;
         }
-
-        .bar-fill {
-          height: 100%;
-          background: var(--primary);
-        }
+        .bar-fill { height: 100%; background: var(--primary); }
 
         /* Tooltip & Badges */
-        .custom-tooltip {
-          padding: 12px;
-          border-radius: 12px;
-        }
-
+        .custom-tooltip { padding: 12px; border-radius: 12px; background: rgba(16, 20, 30, 0.95); border: 1px solid var(--border-color); backdrop-filter: blur(10px); }
         .tooltip-name { font-weight: 700; margin-bottom: 2px; }
         .tooltip-role { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
         .tooltip-stats { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;}
         .stat-label { font-size: 0.85rem; color: var(--text-dim); }
-
-        .badge-type {
-          font-size: 0.75rem;
-          padding: 4px 8px;
-          border-radius: 100px;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-
+        .badge-type { font-size: 0.75rem; padding: 4px 8px; border-radius: 100px; font-weight: 600; text-transform: uppercase; }
+        
         .silent-architect { background: rgba(52, 168, 83, 0.2); color: #34a853; }
-        .high-visibility { background: rgba(234, 67, 53, 0.2); color: #ea4335; }
+        .high-visibility, .high-noise { background: rgba(234, 67, 53, 0.2); color: #ea4335; }
         .core-contributor { background: rgba(66, 133, 244, 0.2); color: #4285f4; }
-        .balanced { background: rgba(255, 255, 255, 0.1); color: white; }
+        .contributor { background: rgba(255, 255, 255, 0.1); color: white; }
 
-        @media (max-width: 1100px) {
-          .dashboard-grid { grid-template-columns: 1fr; }
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-bottom: 24px;
+        }
+        
+        .members-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .member-input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 12px;
+        }
+        
+        .member-input-row input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            outline: none;
+        }
+        
+        .member-input-row input:focus {
+            border-color: var(--primary);
+        }
+        
+        .btn-icon.danger {
+            color: var(--danger);
+            background: rgba(234, 67, 53, 0.1);
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .btn-dashed {
+            width: 100%;
+            border: 1px dashed var(--border-color);
+            background: transparent;
+            color: var(--text-dim);
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: 0.2s;
+        }
+        
+        .btn-dashed:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
         }
 
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 60px;
-          gap: 20px;
-          height: 400px;
-        }
-
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(255, 255, 255, 0.1);
-          border-top-color: var(--primary);
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
       `}</style>
     </div>
   );

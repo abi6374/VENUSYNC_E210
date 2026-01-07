@@ -21,6 +21,10 @@ const projectSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    repository: {
+        type: String, // e.g., "owner/repo"
+        required: true
     }
 });
 

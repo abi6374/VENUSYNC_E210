@@ -5,8 +5,12 @@ import morgan from 'morgan';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import * as mlBridge from './ml_bridge.js';
-import User from './models/User.js';
-import Project from './models/Project.js';
+import _User from './models/User.js';
+import _Project from './models/Project.js';
+import { MockUser, MockProject } from './utils/MockStore.js';
+
+let User = _User;
+let Project = _Project;
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,12 +30,14 @@ app.use(bodyParser.json());
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 10000,
 })
-    .then(() => console.log('MongoDB Connected Successfully'))
+    .then(() => console.log('✅ MongoDB Connected Successfully: USING LIVE DATABASE'))
     .catch(err => {
-        console.error('MongoDB Connection Error:', err.message);
-        console.log('Running in offline mode - using in-memory storage');
+        console.error('❌ MongoDB Connection Error:', err.message);
+        console.log('⚠️  Running in OFFLINE MODE - Data will NOT be saved to MongoDB Atlas.');
+        User = MockUser;
+        Project = MockProject;
     });
 
 // Health Check
@@ -57,7 +63,11 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(201).json({ name: newUser.name, role: newUser.role });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Registration failed' });
+        res.status(500).json({
+            error: 'Registration failed',
+            details: error.message,
+            mode: User === _User ? 'Mongo' : 'Mock'
+        });
     }
 });
 
@@ -90,13 +100,56 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', async (req, res) => {
     try {
-        const { name, members } = req.body;
-        const newProject = new Project({ name, members });
+        const { name, members, repository } = req.body;
+        const newProject = new Project({ name, members, repository });
         await newProject.save();
         res.status(201).json(newProject);
     } catch (error) {
         console.error('Error creating project:', error);
         res.status(500).json({ error: 'Failed to create project' });
+    }
+});
+
+app.get('/api/projects/:projectId', async (req, res) => {
+    try {
+        const project = await Project.findById(req.params.projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        res.json(project);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch project' });
+    }
+});
+
+app.put('/api/projects/:projectId', async (req, res) => {
+    console.log("---------------------------------------------------------");
+    console.log(`[PUT] Updating project members for: ${req.params.projectId}`);
+
+    try {
+        const { projectId } = req.params;
+        const { members } = req.body;
+        console.log("Receiving Members Payload:", JSON.stringify(members, null, 2));
+
+        if (!members) {
+            console.error("Missing members in body");
+            return res.status(400).json({ error: "Missing members in body" });
+        }
+
+        const project = await Project.findByIdAndUpdate(
+            projectId,
+            { members },
+            { new: true }
+        );
+
+        if (!project) {
+            console.error("Project not found in DB");
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        console.log("✅ Project updated successfully");
+        res.json(project);
+    } catch (error) {
+        console.error('❌ Error updating project:', error);
+        res.status(500).json({ error: 'Failed to update project' });
     }
 });
 

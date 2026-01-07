@@ -23,7 +23,7 @@ const ProjectSelection = () => {
     { id: '2', name: 'Mobile App Redesign', members: 8, lastSync: '5h ago' },
     { id: '3', name: 'Payment Gateway API', members: 5, lastSync: '1d ago' },
   ]);
-  const [newProject, setNewProject] = useState({ name: '', members: [] });
+  const [newProject, setNewProject] = useState({ name: '', repository: '', members: [] });
   const [currentMember, setCurrentMember] = useState({ name: '', github: '', slack: '' });
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -54,6 +54,7 @@ const ProjectSelection = () => {
     try {
       const response = await axios.post('/api/projects', {
         name: newProject.name,
+        repository: newProject.repository,
         members: newProject.members
       });
       setProjects([response.data, ...projects]);
@@ -137,12 +138,12 @@ const ProjectSelection = () => {
           <AnimatePresence>
             {filteredProjects.map((project) => (
               <motion.div
-                key={project.id}
+                key={project._id || project.id}
                 className="project-card glass-card"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ y: -5 }}
-                onClick={() => navigate(`/dashboard/${project.id}`)}
+                onClick={() => navigate(`/dashboard/${project._id || project.id}`)}
               >
                 <div className="card-icon">
                   <CreditCard size={24} className="text-primary" />
@@ -184,6 +185,17 @@ const ProjectSelection = () => {
                     placeholder="e.g. Venusync Core"
                     value={newProject.name}
                     onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>GitHub Repository (owner/repo)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. facebook/react"
+                    value={newProject.repository}
+                    onChange={(e) => setNewProject({ ...newProject, repository: e.target.value })}
                     required
                   />
                 </div>
