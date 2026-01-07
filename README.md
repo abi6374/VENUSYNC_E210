@@ -90,7 +90,4 @@ This project shifts performance evaluation from **who speaks the most** to **who
 This project is currently in **prototype / concept validation** stage, focusing on system design, metric definition, and feasibility.
 
 ---
-
-## 👩‍💻 Author
-**Kungumapriyaa**  
 Engineering-focused solution for fair workforce evaluation
