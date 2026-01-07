@@ -20,7 +20,7 @@ export const fetchRepositoryStats = async (repoUrl, members) => {
         console.log(`Fetching stats for ${owner}/${repo}`);
 
         // Helper to fetch with retry for 202 (Computing)
-        const fetchWithRetry = async (route, params, retries = 3) => {
+        const fetchWithRetry = async (route, params, retries = 5) => {
             try {
                 const response = await octokit.request(route, params);
                 if (response.status === 202) {
@@ -60,8 +60,14 @@ export const fetchRepositoryStats = async (repoUrl, members) => {
         }
 
         // 3. Map stats to our members
+        const availableLogins = Array.isArray(contributorsStats)
+            ? contributorsStats.map(s => s.author?.login.toLowerCase())
+            : [];
+
+        console.log(`Available Logins in Repo: [${availableLogins.join(', ')}]`);
+
         const memberStats = members.map(member => {
-            const githubUser = member.github ? member.github.toLowerCase() : '';
+            const githubUser = member.github ? member.github.toLowerCase().trim() : '';
 
             if (!githubUser) return {
                 username: 'unknown', commits: 0, prs: 0, mergedPrs: 0, additions: 0, deletions: 0
@@ -71,6 +77,10 @@ export const fetchRepositoryStats = async (repoUrl, members) => {
             const userStat = Array.isArray(contributorsStats)
                 ? contributorsStats.find(s => s.author && s.author.login.toLowerCase() === githubUser)
                 : null;
+
+            if (!userStat) {
+                console.warn(`⚠️ No match found for user: "${githubUser}". (Searched in ${availableLogins.length} contributors)`);
+            }
 
             const totalCommits = userStat ? userStat.total : 0;
 

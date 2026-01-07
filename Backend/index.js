@@ -18,6 +18,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
+// Also look for .env in the same directory as index.js if root .env wasn't enough
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,18 +29,33 @@ app.use(morgan('dev'));
 app.use(bodyParser.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 10000,
-})
-    .then(() => console.log('✅ MongoDB Connected Successfully: USING LIVE DATABASE'))
-    .catch(err => {
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000,
+            family: 4
+        });
+        console.log('✅ MongoDB Connected Successfully: USING LIVE DATABASE');
+    } catch (err) {
         console.error('❌ MongoDB Connection Error:', err.message);
-        console.log('⚠️  Running in OFFLINE MODE - Data will NOT be saved to MongoDB Atlas.');
-        User = MockUser;
-        Project = MockProject;
-    });
+
+        if (err.message.includes('whitelist') || err.message.includes('IP')) {
+            console.error('👉 ACTION REQUIRED: Your current IP address is likely not whitelisted in MongoDB Atlas.');
+            console.error('   Please go to MongoDB Atlas Network Access and add "0.0.0.0/0" for testing or your specific IP.');
+        }
+
+        if (process.env.NODE_ENV === 'production') {
+            console.error('🚨 CRITICAL: Failed to connect to DB in PRODUCTION mode. App may not function correctly.');
+            // In production, we don't fall back to mock unless explicitly wanted
+        } else {
+            console.log('⚠️  FALLBACK: Running in OFFLINE MODE - Data will NOT be saved to MongoDB Atlas.');
+            User = MockUser;
+            Project = MockProject;
+        }
+    }
+};
+
+connectDB();
 
 // Health Check
 app.get('/', (req, res) => {
@@ -88,10 +105,42 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Project Routes
+const DUMMY_PROJECTS = [
+    {
+        _id: '65e000000000000000000001',
+        name: 'Venusync Core',
+        repository: 'abi6374/VENUSYNC_E210',
+        members: [
+            { name: 'Priya (Lead)', github: 'kungumapriyaa' },
+            { name: 'Abi (Dev)', github: 'abi6374' },
+            { name: 'John (Engineer)', github: 'john-doe-dummy' }
+        ],
+        lastSync: 'Recently',
+        createdAt: new Date()
+    },
+    {
+        _id: '65e000000000000000000002',
+        name: 'React OS Ecosystem',
+        repository: 'facebook/react',
+        members: [
+            { name: 'Dan Abramov', github: 'gaearon' },
+            { name: 'Sophie Alpert', github: 'sophiebits' },
+            { name: 'Andrew Clark', github: 'acdlite' },
+            { name: 'Brian Vaughn', github: 'bvaughn' },
+            { name: 'Sebastian Markbåge', github: 'sebmarkbage' },
+            { name: 'Rachel Nabors', github: 'rachelnabors' },
+            { name: 'Luna Helmer', github: 'luna' }
+        ],
+        lastSync: 'Recently',
+        createdAt: new Date()
+    }
+];
+
 app.get('/api/projects', async (req, res) => {
     try {
-        const projects = await Project.find().sort({ createdAt: -1 });
-        res.json(projects);
+        const dbProjects = await Project.find().sort({ createdAt: -1 });
+        // Merge hardcoded projects with DB projects
+        res.json([...DUMMY_PROJECTS, ...dbProjects]);
     } catch (error) {
         console.error('Error fetching projects:', error);
         res.status(500).json({ error: 'Failed to fetch projects' });
@@ -112,7 +161,11 @@ app.post('/api/projects', async (req, res) => {
 
 app.get('/api/projects/:projectId', async (req, res) => {
     try {
-        const project = await Project.findById(req.params.projectId);
+        const { projectId } = req.params;
+        const dummy = DUMMY_PROJECTS.find(p => p._id === projectId);
+        if (dummy) return res.json(dummy);
+
+        const project = await Project.findById(projectId);
         if (!project) return res.status(404).json({ error: 'Project not found' });
         res.json(project);
     } catch (error) {
@@ -132,6 +185,14 @@ app.put('/api/projects/:projectId', async (req, res) => {
         if (!members) {
             console.error("Missing members in body");
             return res.status(400).json({ error: "Missing members in body" });
+        }
+
+        // Check if it's a dummy project
+        const dummyIndex = DUMMY_PROJECTS.findIndex(p => p._id === projectId);
+        if (dummyIndex !== -1) {
+            console.log("Updating DUMMY project in memory...");
+            DUMMY_PROJECTS[dummyIndex].members = members;
+            return res.json(DUMMY_PROJECTS[dummyIndex]);
         }
 
         const project = await Project.findByIdAndUpdate(
@@ -156,15 +217,19 @@ app.put('/api/projects/:projectId', async (req, res) => {
 app.get('/api/analytics/:projectId', async (req, res) => {
     try {
         const { projectId } = req.params;
-        const project = await Project.findById(projectId);
+        let project = DUMMY_PROJECTS.find(p => p._id === projectId);
+
+        if (!project) {
+            project = await Project.findById(projectId);
+        }
 
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
         }
 
         // Simulate calling the ML logic
-        const analytics = await mlBridge.calculateImpact(project);
-        res.json(analytics);
+        const analyzedMembers = await mlBridge.calculateImpact(project);
+        res.json({ members: analyzedMembers });
     } catch (error) {
         console.error('Error fetching analytics:', error);
         res.status(500).json({ error: 'Failed to fetch analytics' });

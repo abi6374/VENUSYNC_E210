@@ -1,19 +1,48 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DB_FILE = path.join(__dirname, 'db.json');
+
+const loadData = () => {
+    if (!fs.existsSync(DB_FILE)) {
+        return { users: [], projects: [] };
+    }
+    try {
+        const data = fs.readFileSync(DB_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        console.error("Error reading mock DB:", e);
+        return { users: [], projects: [] };
+    }
+};
+
+const saveData = (data) => {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error("Error saving mock DB:", e);
+    }
+};
 
 export class MockUser {
-    static users = [];
+    static get users() {
+        return loadData().users;
+    }
 
     constructor(data) {
         this._doc = { ...data };
         if (!this._doc._id) {
             this._doc._id = Date.now().toString();
         }
-
-        // Copy properties to the instance itself so they are accessible directly
         Object.assign(this, this._doc);
     }
 
     static findOne(query) {
-        return Promise.resolve(this.users.find(u => {
+        const users = this.users;
+        return Promise.resolve(users.find(u => {
             for (let key in query) {
                 if (u[key] !== query[key]) return false;
             }
@@ -22,54 +51,66 @@ export class MockUser {
     }
 
     save() {
-        // Update the static store
-        // Check if exists
-        const index = MockUser.users.findIndex(u => u._id === this._doc._id);
+        const data = loadData();
+        const index = data.users.findIndex(u => u._id === this._doc._id);
         if (index >= 0) {
-            MockUser.users[index] = { ...this };
+            data.users[index] = { ...this };
         } else {
-            MockUser.users.push({ ...this });
+            data.users.push({ ...this });
         }
+        saveData(data);
         return Promise.resolve(this);
     }
 }
 
 export class MockProject {
-    static projects = [];
+    static get projects() {
+        return loadData().projects;
+    }
 
     constructor(data) {
         this._doc = {
             ...data,
-            createdAt: new Date(),
+            createdAt: data.createdAt || new Date(),
             members: data.members || []
         };
         if (!this._doc._id) {
             this._doc._id = Date.now().toString();
         }
-
         Object.assign(this, this._doc);
     }
 
     static find() {
         return {
-            sort: () => Promise.resolve([...MockProject.projects].reverse())
+            sort: () => Promise.resolve([...this.projects].reverse())
         };
     }
 
     static findById(id) {
-        // The findById result normally returns a Mongoose document
-        // We'll return a raw object here which should be 'enough' for read operations
-        const p = MockProject.projects.find(p => p._id === id);
+        const p = this.projects.find(p => p._id === id);
         return Promise.resolve(p ? new MockProject(p) : null);
     }
 
-    save() {
-        const index = MockProject.projects.findIndex(p => p._id === this._doc._id);
+    static findByIdAndUpdate(id, update, options) {
+        const data = loadData();
+        const index = data.projects.findIndex(p => p._id === id);
         if (index >= 0) {
-            MockProject.projects[index] = { ...this };
-        } else {
-            MockProject.projects.push({ ...this });
+            data.projects[index] = { ...data.projects[index], ...update };
+            saveData(data);
+            return Promise.resolve(new MockProject(data.projects[index]));
         }
+        return Promise.resolve(null);
+    }
+
+    save() {
+        const data = loadData();
+        const index = data.projects.findIndex(p => p._id === this._doc._id);
+        if (index >= 0) {
+            data.projects[index] = { ...this };
+        } else {
+            data.projects.push({ ...this });
+        }
+        saveData(data);
         return Promise.resolve(this);
     }
 }
