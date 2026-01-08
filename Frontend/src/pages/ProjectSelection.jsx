@@ -13,7 +13,10 @@ import {
   X,
   CreditCard,
   ChevronRight,
-  User
+  User,
+  AlertCircle,
+  Trash2,
+  CheckCircle
 } from 'lucide-react';
 
 const ProjectSelection = () => {
@@ -28,6 +31,8 @@ const ProjectSelection = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -51,22 +56,72 @@ const ProjectSelection = () => {
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const errors = {};
+    if (!newProject.name.trim()) errors.name = 'Project name is required';
+    if (!newProject.repository.trim()) errors.repository = 'GitHub repository is required';
+
+    let finalMembers = [...newProject.members];
+    if (currentMember.name && currentMember.github) {
+      finalMembers.push(currentMember);
+    }
+    if (finalMembers.length === 0) errors.members = 'At least one team member is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
     try {
+      setSubmitting(true);
+      // URL Cleanup
+      let repoPath = newProject.repository.trim();
+
+      // Auto-extract owner/repo if full URL is pasted
+      if (repoPath.includes('github.com')) {
+        const parts = repoPath.replace(/\/$/, '').split('/');
+        if (parts.length >= 2) {
+          repoPath = `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+        }
+      }
+
+      const nameRegex = /^[A-Za-z\s]+$/;
+      const invalidMember = finalMembers.find(m => !nameRegex.test(m.name));
+      if (invalidMember) {
+        setFieldErrors({ members: `Invalid name: "${invalidMember.name}". Only alphabets allowed.` });
+        setSubmitting(false);
+        return;
+      }
+
       const response = await axios.post('api/projects', {
         name: newProject.name,
-        repository: newProject.repository,
-        members: newProject.members
+        repository: repoPath,
+        members: finalMembers
       });
+
       setProjects([response.data, ...projects]);
       setShowModal(false);
-      setNewProject({ name: '', members: [] });
+      setNewProject({ name: '', repository: '', members: [] });
+      setCurrentMember({ name: '', github: '', slack: '' });
     } catch (error) {
       console.error('Error creating project:', error);
+      setFieldErrors({
+        members: 'Failed to create project. Please try again.'
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const addMember = () => {
+    const nameRegex = /^[A-Za-z\s]+$/;
     if (currentMember.name && currentMember.github) {
+      if (!nameRegex.test(currentMember.name)) {
+        setFieldErrors({ members: 'Team member name must only contain alphabets.' });
+        return;
+      }
+      setFieldErrors({});
       setNewProject({
         ...newProject,
         members: [...newProject.members, currentMember]
@@ -81,7 +136,37 @@ const ProjectSelection = () => {
     setNewProject({ ...newProject, members: updatedMembers });
   };
 
-  const filteredProjects = projects.filter(p =>
+  const handleDeleteProject = async (e, projectId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this project?')) return;
+    try {
+      await axios.delete(`api/projects/${projectId}`);
+      setProjects(projects.filter(p => (p._id || p.id) !== projectId));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to delete project';
+      alert(errorMessage);
+    }
+  };
+
+  const handleToggleStatus = async (e, project) => {
+    e.stopPropagation();
+    const newStatus = project.status === 'completed' ? 'active' : 'completed';
+    try {
+      const response = await axios.patch(`api/projects/${project._id || project.id}/status`, { status: newStatus });
+      setProjects(projects.map(p => (p._id || p.id) === (project._id || project.id) ? response.data : p));
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
+
+  const sortedProjects = [...projects].sort((a, b) => {
+    if (a.status === 'completed' && b.status !== 'completed') return 1;
+    if (a.status !== 'completed' && b.status === 'completed') return -1;
+    return 0;
+  });
+
+  const filteredProjects = sortedProjects.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -139,22 +224,40 @@ const ProjectSelection = () => {
             {filteredProjects.map((project) => (
               <motion.div
                 key={project._id || project.id}
-                className="project-card glass-card"
+                className={`project-card glass-card ${project.status === 'completed' ? 'completed' : ''}`}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ y: -5 }}
                 onClick={() => navigate(`/dashboard/${project._id || project.id}`)}
               >
-                <div className="card-icon">
-                  <CreditCard size={24} className="text-primary" />
+                <div className="card-header-actions">
+                  <div className={`status-badge ${project.status || 'active'}`}>
+                    {project.status === 'completed' ? 'Completed' : 'Active'}
+                  </div>
+                  <button className="btn-icon-delete" onClick={(e) => handleDeleteProject(e, project._id || project.id)}>
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <h3>{project.name}</h3>
-                <div className="card-meta">
-                  <span><User size={14} /> {Array.isArray(project.members) ? project.members.length : project.members} Members</span>
-                  <span>Synced {project.lastSync || 'Recently'}</span>
+
+                <div className="card-body">
+                  <div className="card-icon">
+                    <CreditCard size={24} className="text-primary" />
+                  </div>
+                  <h3>{project.name}</h3>
+                  <div className="card-meta">
+                    <span><User size={14} /> {Array.isArray(project.members) ? project.members.length : project.members} Members</span>
+                    <span>Synced {project.lastSync || 'Recently'}</span>
+                  </div>
                 </div>
+
                 <div className="card-footer">
                   <span className="view-link">View Dashboard <ChevronRight size={16} /></span>
+                  <button
+                    className={`btn-status ${project.status === 'completed' ? 'mark-active' : 'mark-complete'}`}
+                    onClick={(e) => handleToggleStatus(e, project)}
+                  >
+                    {project.status === 'completed' ? 'Reactivate' : 'Mark Completed'}
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -183,10 +286,14 @@ const ProjectSelection = () => {
                   <input
                     type="text"
                     placeholder="e.g. Venusync Core"
+                    className={fieldErrors.name ? 'input-error' : ''}
                     value={newProject.name}
-                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setNewProject({ ...newProject, name: e.target.value });
+                      if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: '' });
+                    }}
                   />
+                  {fieldErrors.name && <span className="error-text">{fieldErrors.name}</span>}
                 </div>
 
                 <div className="form-group">
@@ -194,10 +301,14 @@ const ProjectSelection = () => {
                   <input
                     type="text"
                     placeholder="e.g. facebook/react"
+                    className={fieldErrors.repository ? 'input-error' : ''}
                     value={newProject.repository}
-                    onChange={(e) => setNewProject({ ...newProject, repository: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setNewProject({ ...newProject, repository: e.target.value });
+                      if (fieldErrors.repository) setFieldErrors({ ...fieldErrors, repository: '' });
+                    }}
                   />
+                  {fieldErrors.repository && <span className="error-text">{fieldErrors.repository}</span>}
                 </div>
 
                 <div className="members-section">
@@ -207,7 +318,12 @@ const ProjectSelection = () => {
                       type="text"
                       placeholder="Name"
                       value={currentMember.name}
-                      onChange={(e) => setCurrentMember({ ...currentMember, name: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^[A-Za-z\s]+$/.test(val)) {
+                          setCurrentMember({ ...currentMember, name: val });
+                        }
+                      }}
                     />
                     <div className="input-with-icon">
                       <Github size={16} />
@@ -231,6 +347,7 @@ const ProjectSelection = () => {
                       <Plus size={20} />
                     </button>
                   </div>
+                  {fieldErrors.members && <span className="error-text" style={{ marginTop: '8px', display: 'block' }}>{fieldErrors.members}</span>}
 
                   <div className="members-list">
                     {newProject.members.map((m, i) => (
@@ -243,9 +360,12 @@ const ProjectSelection = () => {
                 </div>
 
                 <div className="modal-footer">
-                  <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn-primary" disabled={!newProject.name}>
-                    Initialize Project
+                  <button type="button" className="btn-secondary" onClick={() => {
+                    setShowModal(false);
+                    setFieldErrors({});
+                  }}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={submitting}>
+                    {submitting ? 'Initializing...' : 'Initialize Project'}
                   </button>
                 </div>
               </form>
@@ -358,6 +478,10 @@ const ProjectSelection = () => {
           border-color: rgba(234, 67, 53, 0.2);
         }
 
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+
         .actions-bar {
           display: flex;
           justify-content: space-between;
@@ -432,6 +556,64 @@ const ProjectSelection = () => {
         .card-footer {
           border-top: 1px solid var(--border-color);
           padding-top: 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .project-card.completed {
+          opacity: 0.6;
+          filter: grayscale(0.4);
+        }
+
+        .card-header-actions {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .status-badge {
+          font-size: 0.7rem;
+          padding: 3px 8px;
+          border-radius: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-weight: 700;
+        }
+
+        .status-badge.active { background: rgba(52, 168, 83, 0.1); color: #34a853; }
+        .status-badge.completed { background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
+
+        .btn-icon-delete {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: var(--transition-smooth);
+        }
+
+        .btn-icon-delete:hover { color: #f28b82; }
+
+        .btn-status {
+          font-size: 0.75rem;
+          background: transparent;
+          border: 1px solid var(--glass-border);
+          color: var(--text-muted);
+          padding: 4px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: var(--transition-smooth);
+        }
+
+        .btn-status:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
+        .btn-status.mark-active:hover {
+          border-color: #34a853;
+          color: #34a853;
         }
 
         .view-link {
@@ -492,6 +674,18 @@ const ProjectSelection = () => {
           border-radius: 10px;
           color: white;
           margin-top: 8px;
+        }
+
+        .form-group input.input-error {
+          border-color: #f28b82;
+          background: rgba(217, 48, 37, 0.05);
+        }
+
+        .error-text {
+          color: #f28b82;
+          font-size: 0.75rem;
+          margin-top: 4px;
+          display: block;
         }
 
         .members-section label {

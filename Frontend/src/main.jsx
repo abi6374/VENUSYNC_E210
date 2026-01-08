@@ -5,7 +5,9 @@ import './index.css'
 import axios from 'axios'
 
 // Set backend URL for production
-axios.defaults.baseURL = (import.meta.env.VITE_API_URL || 'https://venusync.onrender.com').replace(/\/$/, '') + '/';
+// Set backend URL for production or development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+axios.defaults.baseURL = API_BASE_URL ? (API_BASE_URL.replace(/\/$/, '') + '/') : '/';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
