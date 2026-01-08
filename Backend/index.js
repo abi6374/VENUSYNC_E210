@@ -90,6 +90,10 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
+    res.json({ status: 'OK', mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected' });
+});
+
+app.get('/api/status', (req, res) => {
     res.json({
         status: 'OK',
         mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
