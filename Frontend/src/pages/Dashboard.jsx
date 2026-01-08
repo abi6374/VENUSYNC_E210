@@ -67,8 +67,8 @@ const Dashboard = () => {
     try {
       setLoading(true);
       const [projRes, analyticsRes] = await Promise.all([
-        axios.get(`api/projects/${projectId}`),
-        axios.get(`api/analytics/${projectId}`)
+        axios.get(`/api/projects/${projectId}`),
+        axios.get(`/api/analytics/${projectId}`)
       ]);
       setProject(projRes.data);
       setTeamData(analyticsRes.data.members || []);
@@ -86,7 +86,7 @@ const Dashboard = () => {
       setLoadingSummary(true);
       setAiSummary('');
 
-      const response = await axios.post('api/analytics/member-summary', memberData);
+      const response = await axios.post('/api/analytics/member-summary', memberData);
       setAiSummary(response.data.summary);
     } catch (err) {
       console.error('Error fetching AI summary:', err);
@@ -107,7 +107,7 @@ const Dashboard = () => {
       }
 
       setSaving(true);
-      await axios.put(`api/projects/${projectId}`, { members: editingMembers });
+      await axios.put(`/api/projects/${projectId}`, { members: editingMembers });
       setShowEditModal(false);
       fetchData();
     } catch (err) {

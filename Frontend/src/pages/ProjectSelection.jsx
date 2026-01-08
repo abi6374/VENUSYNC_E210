@@ -45,7 +45,7 @@ const ProjectSelection = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get('api/projects');
+      const response = await axios.get('/api/projects');
       setProjects(response.data);
       setLoading(false);
     } catch (error) {
@@ -94,7 +94,7 @@ const ProjectSelection = () => {
         return;
       }
 
-      const response = await axios.post('api/projects', {
+      const response = await axios.post('/api/projects', {
         name: newProject.name,
         repository: repoPath,
         members: finalMembers
@@ -140,7 +140,7 @@ const ProjectSelection = () => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this project?')) return;
     try {
-      await axios.delete(`api/projects/${projectId}`);
+      await axios.delete(`/api/projects/${projectId}`);
       setProjects(projects.filter(p => (p._id || p.id) !== projectId));
     } catch (error) {
       console.error('Error deleting project:', error);
@@ -153,7 +153,7 @@ const ProjectSelection = () => {
     e.stopPropagation();
     const newStatus = project.status === 'completed' ? 'active' : 'completed';
     try {
-      const response = await axios.patch(`api/projects/${project._id || project.id}/status`, { status: newStatus });
+      const response = await axios.patch(`/api/projects/${project._id || project.id}/status`, { status: newStatus });
       setProjects(projects.map(p => (p._id || p.id) === (project._id || project.id) ? response.data : p));
     } catch (error) {
       console.error('Error updating status:', error);

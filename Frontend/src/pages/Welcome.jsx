@@ -55,7 +55,7 @@ const Welcome = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('api/auth/google', { credential: response.credential });
+      const res = await axios.post('/api/auth/google', { credential: response.credential });
       localStorage.setItem('user', JSON.stringify(res.data));
       navigate('/projects');
     } catch (err) {
