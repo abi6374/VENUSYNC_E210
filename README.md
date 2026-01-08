@@ -10,7 +10,7 @@ In modern remote and hybrid workplaces, productivity is often misjudged by **vis
 
 ##  Problem Statement
 Current performance evaluations rely heavily on superficial indicators such as:
-- 💬 Frequency of messages in Slack or Teams  
+-  Frequency of messages in Slack or Teams  
 - 🗓️ Meeting participation and stand-up visibility  
 - 🔢 Raw metrics like number of Git commits  
 
