@@ -36,6 +36,21 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+        uptime: process.uptime()
+    });
+});
+
+// COOP Header for Google Auth
+app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    next();
+});
+
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(bodyParser.json());
@@ -341,6 +356,8 @@ app.patch('/api/projects/:projectId/status', async (req, res) => {
 app.get('/api/analytics/:projectId', async (req, res) => {
     try {
         const { projectId } = req.params;
+        console.log(`[Analytics] Request for project: ${projectId}`);
+
         let project = DUMMY_PROJECTS.find(p => p._id === projectId);
 
         if (!project) {
@@ -348,15 +365,36 @@ app.get('/api/analytics/:projectId', async (req, res) => {
         }
 
         if (!project) {
+            console.error(`[Analytics] Project NOT FOUND: ${projectId}`);
             return res.status(404).json({ error: 'Project not found' });
         }
 
+        // Optimization: For dummy projects, return pre-defined mock analytics to avoid ML bridge timeouts
+        if (projectId.startsWith('65e00000')) {
+            console.log(`[Analytics] Returning mock data for dummy project: ${project.name}`);
+            const mockAnalysis = {
+                members: project.members.map((m, i) => ({
+                    name: m.name,
+                    github: m.github,
+                    visibility: 70 - (i * 10),
+                    impact: 85 - (i * 5),
+                    role: i === 0 ? 'Lead Engineer' : 'Developer',
+                    type: i === 0 ? 'Core Contributor' : (i === 1 ? 'Silent Architect' : 'Contributor'),
+                    raw: { commits: 45 - i * 5, prs: 12 - i, merged: 10 - i, additions: 1200, deletions: 300 },
+                    mlFeatures: { daily_coding_hours: 6.5, commits_per_day: 1.2, pull_requests_per_week: 2, issues_closed_per_week: 1.5, active_repos: 3, code_reviews_per_week: 4 }
+                })),
+                repoStats: { predicted_score: 0.88, total_commits: 156, pr_merge_rate: 0.92, avg_pr_size: 450, avg_cycle_time_hrs: 24, prs_total: 45, prs_merged: 41, authors: project.members.length, productivity_indicators: { overall_productivity: true, high_commit_frequency: true, active_pr_process: true, good_issue_resolution: true } }
+            };
+            return res.json(mockAnalysis);
+        }
+
         // Simulate calling the ML logic
+        console.log(`[Analytics] Calling ML Bridge for: ${project.name} (${project.repository})`);
         const analysis = await mlBridge.calculateImpact(project);
         res.json(analysis);
     } catch (error) {
         console.error('Error fetching analytics:', error);
-        res.status(500).json({ error: 'Failed to fetch analytics' });
+        res.status(500).json({ error: 'Failed to fetch analytics', details: error.message });
     }
 });
 
