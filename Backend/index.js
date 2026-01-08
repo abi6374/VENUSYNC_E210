@@ -89,10 +89,10 @@ app.get('/', (req, res) => {
     const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
     res.json({
         status: 'Venusync API is online',
-        version: '1.0.0',
+        storageMode: User === _User ? 'Atlas Database (Real)' : 'Local MockStore (Offline)',
         database: dbStatus,
-        environment: process.env.NODE_ENV || 'development',
-        timestamp: new Date().toISOString()
+        version: '1.0.1',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -100,7 +100,9 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
         mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-        uptime: process.uptime()
+        storageMode: User === _User ? 'Atlas Database (Real)' : 'Local MockStore (Offline)',
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
