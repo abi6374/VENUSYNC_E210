@@ -27,7 +27,16 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// CORS Configuration for production
+const corsOptions = {
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://venusync.netlify.app', 'https://venusync-frontend.netlify.app', 'https://venusync.onrender.com']
+        : ['http://localhost:5177', 'http://localhost:5173'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(bodyParser.json());
 
