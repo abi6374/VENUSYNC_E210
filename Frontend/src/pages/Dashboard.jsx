@@ -76,6 +76,12 @@ const Dashboard = () => {
       setEditingMembers(projRes.data.members || []);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
+      if (err.response?.status === 404) {
+        alert('Project not found. Redirecting to project selection.');
+        navigate('/projects');
+      } else {
+        setError(err.response?.data?.error || 'Failed to sync with analytics engine');
+      }
     } finally {
       setLoading(false);
     }

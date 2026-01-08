@@ -218,7 +218,7 @@ const Welcome = () => {
                 useOneTap
                 theme="filled_black"
                 shape="pill"
-                width="100%"
+                width="350"
               />
             </div>
           </form>
