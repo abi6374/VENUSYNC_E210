@@ -36,13 +36,6 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-        uptime: process.uptime()
-    });
-});
 
 // COOP Header for Google Auth
 app.use((req, res, next) => {
