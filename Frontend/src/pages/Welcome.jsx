@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, Github, Slack, Zap, BarChart3, Users, Mail, User, Lock, ChevronDown, AlertCircle, Sun, Moon } from 'lucide-react';
 import axios from 'axios';
-import { GoogleLogin } from '@react-oauth/google';
 
 const Welcome = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -46,22 +45,6 @@ const Welcome = () => {
       navigate('/projects');
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (response) => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post('/api/auth/google', { credential: response.credential });
-      localStorage.setItem('user', JSON.stringify(res.data));
-      navigate('/projects');
-    } catch (err) {
-      console.error('Google Auth Error Details:', err.response?.data);
-      const msg = err.response?.data?.details || err.response?.data?.error || 'Google Login failed';
-      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -206,21 +189,6 @@ const Welcome = () => {
               {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
               {!loading && <ArrowRight size={18} />}
             </button>
-
-            <div className="auth-divider">
-              <span>OR</span>
-            </div>
-
-            <div className="google-login-container">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() => setError('Google Login Failed')}
-                useOneTap
-                theme="filled_black"
-                shape="pill"
-                width="350"
-              />
-            </div>
           </form>
 
           <p className="auth-footer">
@@ -597,7 +565,7 @@ const Welcome = () => {
           .auth-container { max-width: 500px; margin: 0 auto; }
         }
       `}</style>
-    </div>
+    </div >
   );
 };
 

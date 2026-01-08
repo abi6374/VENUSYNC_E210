@@ -30,6 +30,10 @@ const projectSchema = new mongoose.Schema({
         type: String,
         enum: ['active', 'completed'],
         default: 'active'
+    },
+    lastAnalytics: {
+        type: Object,
+        default: null
     }
 });
 

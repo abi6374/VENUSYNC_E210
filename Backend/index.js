@@ -391,9 +391,36 @@ app.get('/api/analytics/:projectId', async (req, res) => {
         // Simulate calling the ML logic
         console.log(`[Analytics] Calling ML Bridge for: ${project.name} (${project.repository})`);
         const analysis = await mlBridge.calculateImpact(project);
+
+        // PERSISTENCE: Store the results in the database if it's a real project
+        if (!projectId.startsWith('65e00000')) {
+            try {
+                await Project.findByIdAndUpdate(projectId, {
+                    lastAnalytics: analysis,
+                    lastSync: new Date().toLocaleString()
+                });
+                console.log(`[Analytics] Successfully cached results for ${project.name} in DB`);
+            } catch (dbErr) {
+                console.warn(`[Analytics] Failed to cache results to DB: ${dbErr.message}`);
+            }
+        }
+
         res.json(analysis);
     } catch (error) {
         console.error('Error fetching analytics:', error);
+
+        // FALLBACK: If live fetch fails, try to return the cached results from the DB
+        try {
+            const { projectId } = req.params;
+            const project = await Project.findById(projectId);
+            if (project && project.lastAnalytics) {
+                console.log(`[Analytics] Live fetch failed, returning CACHED results for ${project.name}`);
+                return res.json(project.lastAnalytics);
+            }
+        } catch (fallbackErr) {
+            console.error('[Analytics] Fallback also failed');
+        }
+
         res.status(500).json({ error: 'Failed to fetch analytics', details: error.message });
     }
 });

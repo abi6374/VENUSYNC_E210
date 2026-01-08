@@ -10,3 +10,9 @@
 
 [build.environment]
   VITE_API_URL = "https://venusync.onrender.com"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    Cross-Origin-Embedder-Policy = "unsafe-none"
