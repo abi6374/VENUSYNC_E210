@@ -1,82 +1,103 @@
 /**
  * ML Bridge - The logic that quantifies the value of work.
- * Now integrated with Hugging Face Predictive Model.
+ * Now integrated with Advanced HF Analytics.
  */
 
 import { fetchRepositoryStats } from './services/github.js';
 import axios from 'axios';
 
-const ML_MODEL_URL = 'https://abinivas8-devpro.hf.space/predict';
+const ANALYTICS_ENDPOINT = 'https://abinivas8-venusync.hf.space/analyze-github';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+
+/**
+ * Fetches overall project analytics from the new HF model
+ */
+export const fetchProjectStats = async (repoPath) => {
+    try {
+        const repoUrl = repoPath.startsWith('http') ? repoPath : `https://github.com/${repoPath}`;
+        console.log(`[ML] Fetching repo-wide analytics for: ${repoUrl}`);
+
+        const response = await axios.post(ANALYTICS_ENDPOINT, {
+            repo_url: repoUrl,
+            github_token: GITHUB_TOKEN
+        }, { timeout: 15000 });
+
+        return response.data;
+    } catch (err) {
+        console.error('[ML] Failed to fetch repo analytics:', err.message);
+        return null;
+    }
+};
 
 export const calculateImpact = async (project) => {
-    // 1. Fetch Real Data from GitHub
-    let stats = [];
-    let isDummy = project._id && project._id.toString().startsWith('65e000000000');
+    // 1. Fetch Overall Repo Stats for general context
+    const projectAnalytics = await fetchProjectStats(project.repository);
 
-    if (project.repository) {
-        stats = await fetchRepositoryStats(project.repository, project.members);
-    }
+    // 2. Fetch Raw GitHub Stats for all members (Verified baseline)
+    const githubStats = await fetchRepositoryStats(project.repository, project.members);
 
-    // 2. Process Member Data through ML Model
+    // 3. Fetch Individual Analysis from the model for each member
     const memberPromises = project.members.map(async (member, idx) => {
-        let memberStat = stats.find(s => s.username === (member.github || '').toLowerCase());
+        const username = (member.github || '').trim();
+        const raw = githubStats.find(s => s.username.toLowerCase() === username.toLowerCase()) ||
+            { commits: 0, prs: 0, mergedPrs: 0, additions: 0, deletions: 0 };
 
-        // --- DATA PREP FOR ML MODEL ---
-        // Fetch raw stats or use seeded dummy values for simulation
-        const commits = memberStat ? memberStat.commits : (isDummy ? 20 + (idx * 5) : 0);
-        const prs = memberStat ? memberStat.prs : (isDummy ? 5 + idx : 0);
-        const merged = memberStat ? memberStat.mergedPrs : (isDummy ? 4 + idx : 0);
-
-        // Construct the payload for Hugging Face model
-        const mlFeatures = {
-            daily_coding_hours: Math.min(12, (commits * 0.2) + (prs * 1.5) + 2).toFixed(1),
-            commits_per_day: Math.ceil(commits / 7) || 1,
-            pull_requests_per_week: prs || 1,
-            issues_closed_per_week: Math.ceil(merged * 0.8) || 1,
-            active_repos: 5, // Theoretical average
-            code_reviews_per_week: Math.ceil(prs * 1.2) || 2
-        };
-
-        let predictedScore = 50; // Default fallback
-
-        try {
-            console.log(`[ML] Calling model for ${member.name}...`);
-            // The user provided the list ["daily_coding_hours", ...] which suggests the model expects an array or specific JSON
-            // Based on the example provided, we send the JSON object
-            const mlResponse = await axios.post(ML_MODEL_URL, mlFeatures, {
-                timeout: 5000
-            });
-
-            // The model returns: { "predicted_score": 64.4, "status": "success" }
-            predictedScore = mlResponse.data.predicted_score || mlResponse.data.prediction || mlResponse.data.score || mlResponse.data[0] || 75;
-            console.log(`[ML] ${member.name} Score: ${predictedScore}`);
-        } catch (err) {
-            console.warn(`[ML] Prediction failed for ${member.name}, using heuristic. Error: ${err.message}`);
-            // Heuristic Fallback
-            predictedScore = Math.min(100, (commits * 2) + (prs * 10));
+        let userModelData = null;
+        if (username && !username.includes('dummy')) {
+            try {
+                console.log(`[ML] Fetching individual analysis for: ${username}`);
+                const response = await axios.post(ANALYTICS_ENDPOINT, {
+                    repo_url: project.repository.startsWith('http') ? project.repository : `https://github.com/${project.repository}`,
+                    github_token: GITHUB_TOKEN,
+                    username: username
+                }, { timeout: 15000 });
+                userModelData = response.data;
+            } catch (err) {
+                console.warn(`[ML] Model unavailable for ${username}.`);
+            }
         }
 
-        // Map ML prediction to our UI range
-        // Scaling: if prediction is 0-1, multiply by 100. If 1-10, multiply by 10.
-        let finalImpact = predictedScore;
-        if (finalImpact < 1) finalImpact *= 100;
-        else if (finalImpact < 10) finalImpact *= 10;
+        // IMPACT: Real model score or 0 if unavailable
+        const impact = userModelData?.predicted_score ? Math.floor(userModelData.predicted_score * 100) : 0;
 
-        finalImpact = Math.min(100, Math.floor(finalImpact));
-        let finalVisibility = Math.min(100, Math.floor((commits * 3) + (prs * 5)));
+        // FEATURES: Taken directly from model or 0
+        const mlFeatures = userModelData?.ml_features || {
+            daily_coding_hours: 0,
+            commits_per_day: 0,
+            pull_requests_per_week: 0,
+            issues_closed_per_week: 0,
+            active_repos: 0,
+            code_reviews_per_week: 0
+        };
+
+        // VISIBILITY: Based purely on real activity
+        const visibility = Math.min(100, (raw.commits * 3) + (raw.prs * 5));
 
         return {
             name: member.name,
-            github: member.github,
-            visibility: finalVisibility,
-            impact: finalImpact,
-            role: member.role || 'Engineer',
-            type: determineType(finalVisibility, finalImpact),
-            raw: { commits, prs, merged }
+            github: username,
+            visibility,
+            impact: impact || visibility, // Use activity-based visibility as impact fallback if model fails
+            role: member.role || (idx === 0 ? 'Lead Engineer' : 'Developer'),
+            type: determineType(visibility, impact || visibility),
+            raw: {
+                commits: raw.commits,
+                prs: raw.prs,
+                merged: raw.mergedPrs,
+                additions: raw.additions,
+                deletions: raw.deletions
+            },
+            mlFeatures,
+            indicators: userModelData?.productivity_indicators
         };
     });
 
-    return Promise.all(memberPromises);
+    const analyzedMembers = await Promise.all(memberPromises);
+
+    return {
+        members: analyzedMembers,
+        repoStats: projectAnalytics
+    };
 };
 
 const determineType = (vis, imp) => {
@@ -85,3 +106,4 @@ const determineType = (vis, imp) => {
     if (imp > 60 && vis > 60) return 'Core Contributor';
     return 'Contributor';
 };
+

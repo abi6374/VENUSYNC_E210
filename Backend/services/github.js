@@ -7,6 +7,20 @@ const octokit = new Octokit({
     userAgent: 'venusync-backend/1.0.0'
 });
 
+export const verifyRepository = async (repoPath) => {
+    try {
+        const [owner, repo] = repoPath.split('/');
+        await octokit.request('GET /repos/{owner}/{repo}', {
+            owner,
+            repo
+        });
+        return true;
+    } catch (error) {
+        console.error(`Repository verification failed for ${repoPath}:`, error.message);
+        return false;
+    }
+};
+
 export const fetchRepositoryStats = async (repoUrl, members) => {
     try {
         // Parse owner/repo from URL or string

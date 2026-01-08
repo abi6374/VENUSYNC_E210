@@ -102,6 +102,17 @@ export class MockProject {
         return Promise.resolve(null);
     }
 
+    static findByIdAndDelete(id) {
+        const data = loadData();
+        const index = data.projects.findIndex(p => p._id === id);
+        if (index >= 0) {
+            const removed = data.projects.splice(index, 1)[0];
+            saveData(data);
+            return Promise.resolve(new MockProject(removed));
+        }
+        return Promise.resolve(null);
+    }
+
     save() {
         const data = loadData();
         const index = data.projects.findIndex(p => p._id === this._doc._id);

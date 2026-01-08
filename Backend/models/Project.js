@@ -25,6 +25,11 @@ const projectSchema = new mongoose.Schema({
     repository: {
         type: String, // e.g., "owner/repo"
         required: true
+    },
+    status: {
+        type: String,
+        enum: ['active', 'completed'],
+        default: 'active'
     }
 });
 

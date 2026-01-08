@@ -8,6 +8,9 @@ import * as mlBridge from './ml_bridge.js';
 import _User from './models/User.js';
 import _Project from './models/Project.js';
 import { MockUser, MockProject } from './utils/MockStore.js';
+import { verifyRepository } from './services/github.js';
+import { OAuth2Client } from 'google-auth-library';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 let User = _User;
 let Project = _Project;
@@ -104,8 +107,43 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+app.post('/api/auth/google', async (req, res) => {
+    try {
+        const { credential } = req.body;
+        if (!credential) {
+            return res.status(400).json({ error: 'Google credential is required' });
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken: credential,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+        const { email, name, picture } = payload;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            // Auto-register if user doesn't exist
+            user = new User({
+                name,
+                email,
+                role: 'Manager', // Default role for Google signups
+                password: Math.random().toString(36).slice(-8) // Random password for DB consistency
+            });
+            await user.save();
+        }
+
+        res.json({ name: user.name, role: user.role, email: user.email, picture });
+    } catch (error) {
+        console.error('❌ Google Auth Error:', error.message);
+        res.status(500).json({ error: 'Google authentication failed', details: error.message });
+    }
+});
+
 // Project Routes
-const DUMMY_PROJECTS = [
+let DUMMY_PROJECTS = [
     {
         _id: '65e000000000000000000001',
         name: 'Venusync Core',
@@ -132,7 +170,8 @@ const DUMMY_PROJECTS = [
             { name: 'Luna Helmer', github: 'luna' }
         ],
         lastSync: 'Recently',
-        createdAt: new Date()
+        createdAt: new Date(),
+        status: 'active'
     }
 ];
 
@@ -150,6 +189,7 @@ app.get('/api/projects', async (req, res) => {
 app.post('/api/projects', async (req, res) => {
     try {
         const { name, members, repository } = req.body;
+
         const newProject = new Project({ name, members, repository });
         await newProject.save();
         res.status(201).json(newProject);
@@ -202,15 +242,75 @@ app.put('/api/projects/:projectId', async (req, res) => {
         );
 
         if (!project) {
-            console.error("Project not found in DB");
+            console.error("Project not found in DB:", projectId);
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        console.log("✅ Project updated successfully");
+        console.log(`✅ Project ${projectId} updated successfully in MongoDB`);
         res.json(project);
     } catch (error) {
         console.error('❌ Error updating project:', error);
         res.status(500).json({ error: 'Failed to update project' });
+    }
+});
+
+app.delete('/api/projects/:projectId', async (req, res) => {
+    const { projectId } = req.params;
+    console.log(`[DELETE] Request for project: ${projectId}`);
+    try {
+        // 1. Check if it's a dummy project in memory
+        const dummyIndex = DUMMY_PROJECTS.findIndex(p => p._id === projectId);
+        if (dummyIndex !== -1) {
+            console.log("Removing dummy project from server memory...");
+            DUMMY_PROJECTS.splice(dummyIndex, 1);
+            return res.json({ message: 'Dummy project removed' });
+        }
+
+        // 2. Try DB/MockStore
+        console.log("Attempting removal from DB or MockStore...");
+
+        let project;
+        try {
+            project = await Project.findByIdAndDelete(projectId);
+        } catch (err) {
+            if (err.name === 'CastError' || err.kind === 'ObjectId') {
+                console.error("Invalid project ID format:", projectId);
+                return res.status(404).json({ error: 'Project not found (Invalid ID format)' });
+            }
+            throw err;
+        }
+
+        if (!project) {
+            console.error("Project ID not found in DB or MockStore:", projectId);
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        console.log("✅ Deletion successful");
+        res.json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        console.error('❌ Delete route error:', error);
+        res.status(500).json({ error: 'Failed to delete project', details: error.message });
+    }
+});
+
+app.patch('/api/projects/:projectId/status', async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { status } = req.body;
+
+        // Check dummy projects
+        const dummyIndex = DUMMY_PROJECTS.findIndex(p => p._id === projectId);
+        if (dummyIndex !== -1) {
+            DUMMY_PROJECTS[dummyIndex].status = status;
+            return res.json(DUMMY_PROJECTS[dummyIndex]);
+        }
+
+        const project = await Project.findByIdAndUpdate(projectId, { status }, { new: true });
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        res.json(project);
+    } catch (error) {
+        console.error('Status update error:', error);
+        res.status(500).json({ error: 'Failed to update project status' });
     }
 });
 
@@ -228,13 +328,36 @@ app.get('/api/analytics/:projectId', async (req, res) => {
         }
 
         // Simulate calling the ML logic
-        const analyzedMembers = await mlBridge.calculateImpact(project);
-        res.json({ members: analyzedMembers });
+        const analysis = await mlBridge.calculateImpact(project);
+        res.json(analysis);
     } catch (error) {
         console.error('Error fetching analytics:', error);
         res.status(500).json({ error: 'Failed to fetch analytics' });
     }
 });
+
+// AI Summary Generation Endpoint
+app.post('/api/analytics/member-summary', async (req, res) => {
+    try {
+        const memberData = req.body;
+
+        if (!memberData || !memberData.name) {
+            return res.status(400).json({ error: 'Member data is required' });
+        }
+
+        const { generateDeveloperSummary } = await import('./services/aiSummary.js');
+        const summary = await generateDeveloperSummary(memberData);
+
+        res.json({ summary });
+    } catch (error) {
+        console.error('Error generating AI summary:', error);
+        res.status(500).json({
+            error: 'Failed to generate summary',
+            summary: `${memberData?.name || 'This developer'} shows consistent contribution patterns. Recommended: Continue current trajectory with focus on code review participation.`
+        });
+    }
+});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
