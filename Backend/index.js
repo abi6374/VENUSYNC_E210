@@ -69,9 +69,24 @@ const connectDB = async () => {
 
 connectDB();
 
-// Health Check
+// Health Check with detailed status
 app.get('/', (req, res) => {
-    res.json({ status: 'Venusync API is online', version: '1.0.0' });
+    const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+    res.json({
+        status: 'Venusync API is online',
+        version: '1.0.0',
+        database: dbStatus,
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+        uptime: process.uptime()
+    });
 });
 
 // Auth Routes
